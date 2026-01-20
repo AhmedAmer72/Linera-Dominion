@@ -1,3 +1,13 @@
+/**
+ * Re-export everything from the linera/ directory for backwards compatibility
+ * This file exists because both linera.ts and linera/ directory existed.
+ * TypeScript resolves to this file when importing from '@/lib/linera'
+ */
+
+// Re-export everything from the linera directory
+export * from './linera/index';
+
+// Also keep the legacy Apollo-based types for backwards compatibility
 import { lineraClient, buildGraphQLEndpoint, LINERA_CONFIG } from './apollo';
 import {
   GET_DOMINION_STATE,
