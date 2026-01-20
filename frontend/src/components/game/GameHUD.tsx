@@ -11,6 +11,7 @@ import { BuildingsPanel } from '../panels/BuildingsPanel';
 import { FleetsPanel } from '../panels/FleetsPanel';
 import { ResearchPanel } from '../panels/ResearchPanel';
 import { GalaxyPanel } from '../panels/GalaxyPanel';
+import { DiplomacyPanel } from '../panels/DiplomacyPanel';
 import { MiniMap } from './MiniMap';
 
 export function GameHUD() {
@@ -28,6 +29,8 @@ export function GameHUD() {
         return <ResearchPanel />;
       case 'galaxy':
         return <GalaxyPanel />;
+      case 'diplomacy':
+        return <DiplomacyPanel />;
       default:
         return <OverviewPanel />;
     }

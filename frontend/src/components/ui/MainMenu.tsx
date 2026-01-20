@@ -63,6 +63,87 @@ function MenuIcon({ src, fallback }: { src: string; fallback: string }) {
   );
 }
 
+// Settings Modal
+function SettingsModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="holo-panel w-full max-w-md p-6"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-2xl font-bold text-white">⚙️ Settings</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">Sound Effects</span>
+            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">Music</span>
+            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-300">Notifications</span>
+            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
+          </div>
+        </div>
+        <p className="mt-4 text-center text-sm text-gray-500">More settings coming soon</p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// About Modal
+function AboutModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="holo-panel w-full max-w-md p-6"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-2xl font-bold text-white">ℹ️ About</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <div className="space-y-4 text-gray-300">
+          <p>
+            <strong className="text-white">Linera Dominion</strong> is a blockchain-powered 
+            MMORTS (Massively Multiplayer Online Real-Time Strategy) game built on the Linera protocol.
+          </p>
+          <p>
+            Build your empire, research technologies, command fleets, and conquer the galaxy!
+          </p>
+          <div className="rounded bg-void/50 p-3">
+            <p className="text-sm"><strong>Version:</strong> 0.1.0</p>
+            <p className="text-sm"><strong>Network:</strong> Conway Testnet</p>
+            <p className="text-sm"><strong>Built with:</strong> Linera SDK, Next.js, Rust</p>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 const menuItems = [
   { id: 'start', label: 'LAUNCH GAME', icon: '🚀', iconSrc: '/images/ships/scout.png' },
   { id: 'settings', label: 'SETTINGS', icon: '⚙️', iconSrc: '/images/research/physics.png' },
@@ -71,6 +152,7 @@ const menuItems = [
 
 export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [modal, setModal] = useState<'settings' | 'about' | null>(null);
   const { connected, shortChainId, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
 
   // Restore connection on mount
@@ -83,21 +165,30 @@ export function MainMenu({ onStart }: MainMenuProps) {
       case 'start':
         onStart();
         break;
-      default:
-        console.log('Menu clicked:', id);
+      case 'settings':
+        setModal('settings');
+        break;
+      case 'about':
+        setModal('about');
+        break;
     }
   };
 
-  console.log('MainMenu rendering');
-
   return (
-    <motion.div
-      className="fixed inset-0 flex flex-col items-center justify-center"
-      style={{ zIndex: 100 }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.5 }}
+    <>
+      {/* Modals */}
+      <AnimatePresence>
+        {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
+        {modal === 'about' && <AboutModal onClose={() => setModal(null)} />}
+      </AnimatePresence>
+
+      <motion.div
+        className="fixed inset-0 flex flex-col items-center justify-center"
+        style={{ zIndex: 100 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}}
     >
       {/* Connect Wallet Button - Top Right */}
       <motion.div
@@ -150,40 +241,29 @@ export function MainMenu({ onStart }: MainMenuProps) {
       {/* Logo */}
       <motion.div
         className="relative mb-8 flex flex-col items-center"
-        initial={{ y: -100, opacity: 0, scale: 0.5 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, duration: 0.8, type: 'spring' }}
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
       >
-        {/* Glowing background */}
-        <motion.div
-          className="absolute inset-0 -z-10 blur-3xl"
+        {/* Glowing background - static */}
+        <div
+          className="absolute inset-0 -z-10 blur-3xl opacity-50"
           style={{
             background: 'radial-gradient(circle, rgba(98, 25, 255, 0.4) 0%, transparent 70%)',
           }}
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.5, 0.9, 0.5],
-          }}
-          transition={{ duration: 4, repeat: Infinity }}
         />
         
         {/* Logo Image */}
-        <motion.div
-          className="relative flex items-center justify-center"
-          animate={{
-            y: [0, -10, 0],
-          }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        >
+        <div className="relative flex items-center justify-center">
           <LogoWithFallback />
-        </motion.div>
+        </div>
         
         {/* Subtitle */}
         <motion.p
           className="mt-6 text-center font-body text-lg text-gray-400"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.3 }}
         >
           Conquer the Galaxy • Build Your Empire • Forge Alliances
         </motion.p>
@@ -274,37 +354,27 @@ export function MainMenu({ onStart }: MainMenuProps) {
         className="absolute bottom-8 right-8 flex items-center gap-2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
+        transition={{ delay: 0.5 }}
       >
-        <motion.div
-          className="h-2 w-2 rounded-full bg-energy-500"
-          animate={{
-            scale: [1, 1.5, 1],
-            opacity: [1, 0.5, 1],
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
+        <div className="h-2 w-2 rounded-full bg-energy-500 animate-pulse" />
         <span className="font-body text-sm text-gray-400">Testnet Connected</span>
       </motion.div>
 
-      {/* Decorative elements */}
-      <motion.div
+      {/* Decorative elements - static for performance */}
+      <div
         className="absolute left-0 top-0 h-40 w-40 opacity-20"
         style={{
           background: 'radial-gradient(circle at center, #6219ff 0%, transparent 70%)',
         }}
-        animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.3, 0.1] }}
-        transition={{ duration: 6, repeat: Infinity }}
       />
-      <motion.div
+      <div
         className="absolute bottom-0 right-0 h-60 w-60 opacity-20"
         style={{
           background: 'radial-gradient(circle at center, #00b8e6 0%, transparent 70%)',
         }}
-        animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.25, 0.1] }}
-        transition={{ duration: 8, repeat: Infinity }}
       />
     </motion.div>
+    </>
   );
 }
 
