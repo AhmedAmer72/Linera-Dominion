@@ -188,8 +188,8 @@ export function MainMenu({ onStart }: MainMenuProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}}
-    >
+        transition={{ duration: 0.3 }}
+      >
       {/* Connect Wallet Button - Top Right */}
       <motion.div
         className="absolute top-6 right-6 z-50"
