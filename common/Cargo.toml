@@ -1,0 +1,17 @@
+[package]
+name = "linera-dominion-common"
+description = "Shared types and utilities for Linera Dominion MMORTS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+linera-sdk.workspace = true
+linera-views.workspace = true
+serde.workspace = true
+bcs.workspace = true
+async-graphql.workspace = true
+sha3.workspace = true
+hex.workspace = true
+thiserror.workspace = true

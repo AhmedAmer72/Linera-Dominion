@@ -1,0 +1,32 @@
+# Build artifacts
+/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Linera
+.linera/
+*.linera-wallet
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# Cargo lock is kept for reproducibility
