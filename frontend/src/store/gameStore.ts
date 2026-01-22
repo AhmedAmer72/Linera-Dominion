@@ -123,6 +123,7 @@ interface GameState {
   // Linera connection
   chainId: string | null;
   appId: string | null;
+  web3Address: string | null;
   connected: boolean;
   isConnecting: boolean;
   walletError: string | null;
@@ -135,7 +136,8 @@ interface GameState {
   setSelectedPanel: (panel: GameState['selectedPanel']) => void;
   selectFleet: (fleetId: number | null) => void;
   selectPlanet: (planetId: number | null) => void;
-  setConnection: (chainId: string, appId: string) => void;
+  setConnection: (chainId: string, appId: string, web3Address?: string) => void;
+  setWeb3Address: (address: string | null) => void;
   setConnecting: (isConnecting: boolean) => void;
   setWalletError: (error: string | null) => void;
   disconnect: () => void;
@@ -182,6 +184,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   chainId: null,
   appId: null,
+  web3Address: null,
   connected: false,
   isConnecting: false,
   walletError: null,
@@ -274,13 +277,22 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   selectPlanet: (selectedPlanetId) => set({ selectedPlanetId }),
   
-  setConnection: (chainId, appId) => set({ chainId, appId, connected: true, isConnecting: false, walletError: null }),
+  setConnection: (chainId, appId, web3Address) => set({ 
+    chainId, 
+    appId, 
+    web3Address: web3Address || null,
+    connected: true, 
+    isConnecting: false, 
+    walletError: null 
+  }),
+  
+  setWeb3Address: (web3Address) => set({ web3Address }),
   
   setConnecting: (isConnecting) => set({ isConnecting }),
   
   setWalletError: (walletError) => set({ walletError, isConnecting: false }),
   
-  disconnect: () => set({ chainId: null, appId: null, connected: false, walletError: null }),
+  disconnect: () => set({ chainId: null, appId: null, web3Address: null, connected: false, walletError: null }),
   
   // Game actions (integrated with Linera GraphQL)
   buildBuilding: async (type, x, y) => {
