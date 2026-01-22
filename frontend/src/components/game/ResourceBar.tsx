@@ -146,6 +146,11 @@ export function ResourceBar() {
   const { resources, resourceRates } = useGameStore();
   const [displayResources, setDisplayResources] = useState(resources);
 
+  // Sync displayResources when resources change (e.g. after building)
+  useEffect(() => {
+    setDisplayResources(resources);
+  }, [resources]);
+
   // Smooth resource counter animation
   useEffect(() => {
     const interval = setInterval(() => {

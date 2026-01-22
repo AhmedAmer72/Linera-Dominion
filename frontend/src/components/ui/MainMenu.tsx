@@ -144,15 +144,169 @@ function AboutModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// How to Play Modal
+function HowToPlayModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="holo-panel w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="font-display text-2xl font-bold text-white">📖 How to Play</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        
+        <div className="space-y-6 text-gray-300">
+          {/* Step 1 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">1</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Connect Your Wallet</h3>
+              <p className="mt-1">Click the "Connect Wallet" button to claim a microchain from the Linera Conway testnet. This is your unique blockchain identity.</p>
+            </div>
+          </div>
+          
+          {/* Step 2 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">2</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Build Production Buildings</h3>
+              <p className="mt-1">Start by building <strong className="text-energy-400">Plasma Mine</strong> (Iron), <strong className="text-plasma-400">Ore Processor</strong> (Deuterium), and <strong className="text-nebula-400">Crystal Synthesizer</strong> (Crystals) to generate resources over time.</p>
+            </div>
+          </div>
+          
+          {/* Step 3 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">3</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Upgrade Your Buildings</h3>
+              <p className="mt-1">Each building level increases production. Upgrade costs increase with level, so plan your upgrades strategically!</p>
+            </div>
+          </div>
+          
+          {/* Step 4 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">4</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Build a Star Forge</h3>
+              <p className="mt-1">Construct a <strong className="text-energy-400">Star Forge</strong> (Shipyard) to unlock ship building. Higher levels allow faster ship construction.</p>
+            </div>
+          </div>
+          
+          {/* Step 5 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">5</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Build Your Fleet</h3>
+              <p className="mt-1">In the Fleet panel, build ships like Scouts, Fighters, and Cruisers. Different ships have different strengths for exploration, combat, and transport.</p>
+            </div>
+          </div>
+          
+          {/* Step 6 */}
+          <div className="flex gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-nebula-500 font-display font-bold text-white">6</div>
+            <div>
+              <h3 className="font-display text-lg font-bold text-white">Research Technologies</h3>
+              <p className="mt-1">Build a <strong className="text-energy-400">Research Lab</strong> to unlock technologies that boost production, combat, and fleet capabilities.</p>
+            </div>
+          </div>
+          
+          {/* Tips */}
+          <div className="rounded-lg border border-energy-500/30 bg-energy-500/10 p-4">
+            <h3 className="font-display text-lg font-bold text-energy-400">💡 Pro Tips</h3>
+            <ul className="mt-2 space-y-2 text-sm">
+              <li>• Use the <strong>Sync Resources</strong> button in Overview to fetch latest blockchain state</li>
+              <li>• Resources are produced per hour based on your building levels</li>
+              <li>• Each game session requires a fresh wallet connection</li>
+              <li>• All actions are recorded on the Linera blockchain!</li>
+            </ul>
+          </div>
+        </div>
+        
+        <motion.button
+          className="mt-6 w-full rounded-lg bg-gradient-to-r from-nebula-600 to-nebula-500 py-3 font-display font-bold text-white hover:from-nebula-500 hover:to-nebula-400"
+          onClick={onClose}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          GOT IT!
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Connect Wallet Popup Modal
+function ConnectWalletModal({ onClose, onConnect }: { onClose: () => void; onConnect: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="holo-panel w-full max-w-md p-6 text-center"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4">
+          <span className="text-6xl">🔗</span>
+        </div>
+        <h2 className="font-display text-2xl font-bold text-white mb-2">Wallet Required</h2>
+        <p className="text-gray-400 mb-6">
+          You need to connect your wallet to play Linera Dominion. 
+          This will claim a microchain for you on the Conway testnet.
+        </p>
+        <div className="flex gap-3">
+          <motion.button
+            className="flex-1 rounded-lg border border-gray-600 bg-void/50 py-3 font-display font-bold text-gray-400 hover:border-gray-500 hover:text-white"
+            onClick={onClose}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            CANCEL
+          </motion.button>
+          <motion.button
+            className="flex-1 rounded-lg bg-gradient-to-r from-nebula-600 to-nebula-500 py-3 font-display font-bold text-white hover:from-nebula-500 hover:to-nebula-400"
+            onClick={() => {
+              onConnect();
+              onClose();
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            CONNECT
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 const menuItems = [
   { id: 'start', label: 'LAUNCH GAME', icon: '🚀', iconSrc: '/images/ships/scout.png' },
+  { id: 'howtoplay', label: 'HOW TO PLAY', icon: '📖', iconSrc: '/images/research/physics.png' },
   { id: 'settings', label: 'SETTINGS', icon: '⚙️', iconSrc: '/images/research/physics.png' },
   { id: 'about', label: 'ABOUT', icon: 'ℹ️', iconSrc: '/images/research/genetics.png' },
 ];
 
 export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [modal, setModal] = useState<'settings' | 'about' | null>(null);
+  const [modal, setModal] = useState<'settings' | 'about' | 'howtoplay' | 'connectwallet' | null>(null);
   const { connected, shortChainId, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
 
   // Restore connection on mount
@@ -164,11 +318,14 @@ export function MainMenu({ onStart }: MainMenuProps) {
     switch (id) {
       case 'start':
         if (!connected) {
-          // Show a prompt to connect wallet first
-          alert('Please connect your wallet first to play!');
+          // Show connect wallet popup
+          setModal('connectwallet');
           return;
         }
         onStart();
+        break;
+      case 'howtoplay':
+        setModal('howtoplay');
         break;
       case 'settings':
         setModal('settings');
@@ -179,20 +336,19 @@ export function MainMenu({ onStart }: MainMenuProps) {
     }
   };
 
-  // Update menu items to show connection requirement
-  const getMenuItems = () => menuItems.map(item => {
-    if (item.id === 'start' && !connected) {
-      return { ...item, label: 'CONNECT TO PLAY' };
-    }
-    return item;
-  });
-
   return (
     <>
       {/* Modals */}
       <AnimatePresence>
         {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
         {modal === 'about' && <AboutModal onClose={() => setModal(null)} />}
+        {modal === 'howtoplay' && <HowToPlayModal onClose={() => setModal(null)} />}
+        {modal === 'connectwallet' && (
+          <ConnectWalletModal 
+            onClose={() => setModal(null)} 
+            onConnect={connectWallet}
+          />
+        )}
       </AnimatePresence>
 
       <motion.div
@@ -289,7 +445,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.6 }}
       >
-        {getMenuItems().map((item, index) => (
+        {menuItems.map((item, index) => (
           <motion.button
             key={item.id}
             className="group relative overflow-hidden"
@@ -298,7 +454,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
             transition={{ delay: 0.6 + index * 0.1, duration: 0.4 }}
             onHoverStart={() => setHoveredItem(item.id)}
             onHoverEnd={() => setHoveredItem(null)}
-            onClick={() => item.id === 'start' && !connected ? connectWallet() : handleMenuClick(item.id)}
+            onClick={() => handleMenuClick(item.id)}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
           >
