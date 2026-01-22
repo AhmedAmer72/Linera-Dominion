@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { useWeb3Wallet } from './useWeb3Wallet';
 
 /**
  * Wallet hook for Linera Dominion
  * 
- * Uses @linera/client WASM directly via the lineraAdapter.
- * Connects to Conway testnet faucet - no local linera service needed.
+ * Uses Web3 wallet (MetaMask) to derive a deterministic Linera identity.
+ * This allows users to keep their progress across sessions.
  */
 export function useWallet() {
   const { 
@@ -18,11 +19,15 @@ export function useWallet() {
     setConnection, 
     setConnecting, 
     setWalletError,
-    disconnect 
+    disconnect: storeDisconnect
   } = useGameStore();
+
+  const web3Wallet = useWeb3Wallet();
 
   // Track if adapter is loaded (client-side only)
   const [adapterLoaded, setAdapterLoaded] = useState(false);
+  // Track Web3 address for display
+  const [web3Address, setWeb3Address] = useState<string | null>(null);
 
   // Load the adapter on mount (client-side only)
   useEffect(() => {
@@ -31,7 +36,9 @@ export function useWallet() {
     }
   }, []);
 
-  // Connect wallet - uses @linera/client WASM to claim a microchain from faucet
+  /**
+   * Connect wallet using Web3 signature for persistent identity
+   */
   const connectWallet = useCallback(async () => {
     if (isConnecting || connected) return;
     
@@ -39,49 +46,46 @@ export function useWallet() {
     setWalletError(null);
     
     try {
-      // Dynamically import the linera adapter (client-side only)
+      // Step 1: Connect Web3 wallet and sign message
+      console.log('🦊 Connecting Web3 wallet...');
+      const web3Result = await web3Wallet.connectAndSign();
+      
+      if (!web3Result) {
+        throw new Error('Web3 wallet connection cancelled');
+      }
+
+      const { address, seed } = web3Result;
+      setWeb3Address(address);
+      
+      // Step 2: Connect to Linera using the deterministic seed
+      console.log('🔄 Connecting to Linera with persistent identity...');
       const { lineraAdapter } = await import('@/lib/linera');
       
-      // Generate a unique user address for this session
-      const userAddress = `user_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      
-      // Connect to Linera via WASM client
-      // This will:
-      // 1. Initialize WASM
-      // 2. Connect to Conway faucet
-      // 3. Create a wallet
-      // 4. Claim a microchain
-      console.log('🔄 Connecting to Linera via WASM client...');
-      const connection = await lineraAdapter.connect(userAddress);
+      const connection = await lineraAdapter.connectWithSeed(seed, address);
       
       if (connection.chainId) {
-        // Store the chain ID in localStorage for persistence
-        localStorage.setItem('linera_chain_id', connection.chainId);
-        localStorage.setItem('linera_connected', 'true');
-        localStorage.setItem('linera_user_address', userAddress);
-        
         // Update the store
         const appId = lineraAdapter.getApplicationId();
         setConnection(connection.chainId, appId);
         
-        console.log('✅ Connected to Linera!');
+        console.log('✅ Connected to Linera with persistent identity!');
+        console.log(`   Web3 Address: ${address}`);
         console.log(`   Chain ID: ${connection.chainId}`);
-        console.log(`   App ID: ${appId || '(not set - deploy contract first)'}`);
+        console.log(`   App ID: ${appId || '(not set)'}`);
         
-        // Try to connect to the application if App ID is set
+        // Try to connect to the application
         if (appId) {
           try {
             await lineraAdapter.connectApplication(appId);
             console.log('✅ Connected to Dominion application!');
           } catch (appError) {
             console.warn('⚠️ Could not connect to application:', appError);
-            // Not fatal - wallet is connected, app connection can happen later
           }
         }
         
         return connection.chainId;
       } else {
-        throw new Error('No chain ID received from faucet');
+        throw new Error('No chain ID received');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet';
@@ -91,9 +95,11 @@ export function useWallet() {
     } finally {
       setConnecting(false);
     }
-  }, [isConnecting, connected, setConnecting, setWalletError, setConnection]);
+  }, [isConnecting, connected, setConnecting, setWalletError, setConnection, web3Wallet]);
 
-  // Disconnect wallet
+  /**
+   * Disconnect wallet
+   */
   const disconnectWallet = useCallback(async () => {
     try {
       const { lineraAdapter } = await import('@/lib/linera');
@@ -102,13 +108,21 @@ export function useWallet() {
       // Ignore import errors during disconnect
     }
     
+    // Disconnect Web3 wallet (clears stored signature)
+    web3Wallet.disconnect();
+    setWeb3Address(null);
+    
+    // Clear old localStorage items
     localStorage.removeItem('linera_chain_id');
     localStorage.removeItem('linera_connected');
     localStorage.removeItem('linera_user_address');
-    disconnect();
-  }, [disconnect]);
+    
+    storeDisconnect();
+  }, [storeDisconnect, web3Wallet]);
 
-  // Clear cache and fully reset wallet
+  /**
+   * Clear cache and fully reset wallet
+   */
   const clearWalletCache = useCallback(async () => {
     try {
       const { lineraAdapter } = await import('@/lib/linera');
@@ -117,46 +131,81 @@ export function useWallet() {
       // Ignore import errors during clear
     }
     
+    web3Wallet.disconnect();
+    setWeb3Address(null);
+    
     localStorage.removeItem('linera_chain_id');
     localStorage.removeItem('linera_connected');
     localStorage.removeItem('linera_user_address');
-    disconnect();
-  }, [disconnect]);
+    storeDisconnect();
+  }, [storeDisconnect, web3Wallet]);
 
-  // Restore connection from localStorage on mount
-  // IMPORTANT: We cannot truly restore the WASM connection - user must reconnect
+  /**
+   * Restore connection from stored Web3 signature
+   */
   const restoreConnection = useCallback(async () => {
-    const savedChainId = localStorage.getItem('linera_chain_id');
-    const wasConnected = localStorage.getItem('linera_connected');
-    const userAddress = localStorage.getItem('linera_user_address');
+    // Check if we have a stored Web3 session
+    const storedSession = web3Wallet.checkStoredSession();
     
-    if (savedChainId && wasConnected === 'true' && userAddress) {
-      // WASM client state isn't persisted across page refreshes
-      // We need to actually reconnect, not just restore UI state
-      console.log('🔄 Previous session detected, attempting to reconnect...');
+    if (storedSession) {
+      console.log('📂 Found stored Web3 session, reconnecting...');
+      setWeb3Address(storedSession.address);
       
-      // Clear the stale stored data first
-      localStorage.removeItem('linera_chain_id');
-      localStorage.removeItem('linera_connected');
-      localStorage.removeItem('linera_user_address');
-      
-      // Don't auto-reconnect - require user to click connect again
-      // This is because each session gets a NEW chain from the faucet
-      console.log('⚠️ Previous session expired. Please connect again for a new chain.');
-      return false;
+      // Auto-reconnect with stored seed
+      setConnecting(true);
+      try {
+        const { lineraAdapter } = await import('@/lib/linera');
+        const connection = await lineraAdapter.connectWithSeed(
+          storedSession.seed, 
+          storedSession.address
+        );
+        
+        const appId = lineraAdapter.getApplicationId();
+        setConnection(connection.chainId, appId);
+        
+        console.log('✅ Restored connection!');
+        console.log(`   Chain ID: ${connection.chainId}`);
+        
+        // Connect to application
+        if (appId) {
+          try {
+            await lineraAdapter.connectApplication(appId);
+            console.log('✅ Connected to Dominion application!');
+          } catch (appError) {
+            console.warn('⚠️ Could not connect to application:', appError);
+          }
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('❌ Failed to restore connection:', error);
+        web3Wallet.disconnect();
+        setWeb3Address(null);
+        return false;
+      } finally {
+        setConnecting(false);
+      }
     }
+    
     return false;
-  }, []);
+  }, [web3Wallet, setConnecting, setConnection]);
 
   // Get shortened chain ID for display
   const shortChainId = chainId 
     ? `${chainId.slice(0, 8)}...${chainId.slice(-6)}`
     : null;
 
+  // Get shortened Web3 address for display
+  const shortWeb3Address = web3Address
+    ? `${web3Address.slice(0, 6)}...${web3Address.slice(-4)}`
+    : null;
+
   return {
     connected,
     chainId,
     shortChainId,
+    web3Address,
+    shortWeb3Address,
     isConnecting,
     walletError,
     adapterLoaded,

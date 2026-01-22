@@ -227,7 +227,7 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
             <ul className="mt-2 space-y-2 text-sm">
               <li>• Use the <strong>Sync Resources</strong> button in Overview to fetch latest blockchain state</li>
               <li>• Resources are produced per hour based on your building levels</li>
-              <li>• Each game session requires a fresh wallet connection</li>
+              <li>• Connect with MetaMask to keep your progress across sessions!</li>
               <li>• All actions are recorded on the Linera blockchain!</li>
             </ul>
           </div>
@@ -264,12 +264,12 @@ function ConnectWalletModal({ onClose, onConnect }: { onClose: () => void; onCon
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4">
-          <span className="text-6xl">🔗</span>
+          <span className="text-6xl">🦊</span>
         </div>
-        <h2 className="font-display text-2xl font-bold text-white mb-2">Wallet Required</h2>
+        <h2 className="font-display text-2xl font-bold text-white mb-2">Connect MetaMask</h2>
         <p className="text-gray-400 mb-6">
-          You need to connect your wallet to play Linera Dominion. 
-          This will claim a microchain for you on the Conway testnet.
+          Connect your MetaMask wallet to play Linera Dominion. 
+          Your progress will be saved and you can continue from any browser!
         </p>
         <div className="flex gap-3">
           <motion.button
@@ -307,7 +307,7 @@ const menuItems = [
 export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [modal, setModal] = useState<'settings' | 'about' | 'howtoplay' | 'connectwallet' | null>(null);
-  const { connected, shortChainId, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
+  const { connected, shortChainId, shortWeb3Address, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
 
   // Restore connection on mount
   useEffect(() => {
@@ -366,15 +366,18 @@ export function MainMenu({ onStart }: MainMenuProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
       >
-        {connected && shortChainId ? (
+        {connected && shortWeb3Address ? (
           <motion.button
             className="flex items-center gap-3 rounded-xl border border-energy-500/50 bg-energy-500/10 px-5 py-3 font-display text-sm font-bold text-energy-400 backdrop-blur-sm transition-all hover:border-energy-500 hover:bg-energy-500/20"
             onClick={disconnectWallet}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <div className="h-2.5 w-2.5 rounded-full bg-energy-500 animate-pulse" />
-            <span>{shortChainId}</span>
+            <span className="text-lg">🦊</span>
+            <div className="flex flex-col items-start">
+              <span>{shortWeb3Address}</span>
+              {shortChainId && <span className="text-xs text-gray-400">{shortChainId}</span>}
+            </div>
           </motion.button>
         ) : (
           <motion.button
@@ -399,8 +402,8 @@ export function MainMenu({ onStart }: MainMenuProps) {
               </>
             ) : (
               <>
-                <span className="text-lg">🔗</span>
-                <span>Connect Wallet</span>
+                <span className="text-lg">🦊</span>
+                <span>Connect MetaMask</span>
               </>
             )}
           </motion.button>

@@ -54,7 +54,7 @@ function LogoIcon() {
 
 // Connect Wallet Button
 function ConnectWalletButton() {
-  const { connected, shortChainId, isConnecting, walletError, connectWallet, disconnectWallet, restoreConnection } = useWallet();
+  const { connected, shortChainId, shortWeb3Address, isConnecting, walletError, connectWallet, disconnectWallet, restoreConnection } = useWallet();
   const [showDropdown, setShowDropdown] = useState(false);
   
   // Restore connection on mount
@@ -62,7 +62,7 @@ function ConnectWalletButton() {
     restoreConnection();
   }, [restoreConnection]);
 
-  if (connected && shortChainId) {
+  if (connected && shortWeb3Address) {
     return (
       <div className="relative">
         <motion.button
@@ -71,27 +71,39 @@ function ConnectWalletButton() {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <div className="h-2 w-2 rounded-full bg-energy-500 animate-pulse" />
-          <span>{shortChainId}</span>
+          <span>🦊</span>
+          <span>{shortWeb3Address}</span>
           <span className="text-xs">▼</span>
         </motion.button>
         
         <AnimatePresence>
           {showDropdown && (
             <motion.div
-              className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-nebula-500/30 bg-void/95 p-2 backdrop-blur-md z-50"
+              className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-nebula-500/30 bg-void/95 p-2 backdrop-blur-md z-50"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
+              <div className="px-3 py-2 border-b border-gray-700 mb-2">
+                <p className="text-xs text-gray-500">Web3 Address</p>
+                <p className="text-sm text-gray-300 font-mono">{shortWeb3Address}</p>
+                {shortChainId && (
+                  <>
+                    <p className="text-xs text-gray-500 mt-1">Linera Chain</p>
+                    <p className="text-sm text-gray-300 font-mono">{shortChainId}</p>
+                  </>
+                )}
+              </div>
               <button
                 className="w-full rounded px-3 py-2 text-left font-body text-sm text-gray-300 hover:bg-nebula-500/20 hover:text-white transition-colors"
                 onClick={() => {
-                  navigator.clipboard.writeText(shortChainId.replace('...', ''));
+                  if (shortWeb3Address) {
+                    navigator.clipboard.writeText(shortWeb3Address);
+                  }
                   setShowDropdown(false);
                 }}
               >
-                📋 Copy Chain ID
+                📋 Copy Address
               </button>
               <button
                 className="w-full rounded px-3 py-2 text-left font-body text-sm text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
@@ -134,8 +146,8 @@ function ConnectWalletButton() {
         </>
       ) : (
         <>
-          <span>🔗</span>
-          <span>Connect Wallet</span>
+          <span>🦊</span>
+          <span>Connect</span>
         </>
       )}
     </motion.button>

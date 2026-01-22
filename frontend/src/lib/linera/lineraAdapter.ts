@@ -115,6 +115,147 @@ class LineraAdapterClass {
   }
 
   /**
+   * Connect to Linera network with a deterministic seed
+   * 
+   * This allows the same Web3 wallet signature to always produce
+   * the same Linera identity, enabling persistent accounts.
+   * 
+   * @param seed - 32-byte seed derived from Web3 wallet signature
+   * @param web3Address - The Web3 wallet address (for identification)
+   * @param faucetUrl - Optional faucet URL override
+   * @returns LineraConnection with client, wallet, chainId, etc.
+   */
+  async connectWithSeed(
+    seed: Uint8Array,
+    web3Address: string,
+    faucetUrl: string = DEFAULT_FAUCET_URL
+  ): Promise<LineraConnection> {
+    const normalizedAddress = web3Address.toLowerCase();
+
+    // If already connected with same address, return existing connection
+    if (this.connection && this.connection.address === normalizedAddress) {
+      console.log('✅ Already connected to Linera');
+      return this.connection;
+    }
+
+    // If connection in progress, wait for it
+    if (this.connectPromise) {
+      console.log('⏳ Connection in progress, waiting...');
+      return this.connectPromise;
+    }
+
+    // Start new connection with seed
+    this.connectPromise = this.performConnectWithSeed(faucetUrl, normalizedAddress, seed);
+    
+    try {
+      const connection = await this.connectPromise;
+      return connection;
+    } finally {
+      this.connectPromise = null;
+    }
+  }
+
+  /**
+   * Internal connection implementation with seeded key
+   */
+  private async performConnectWithSeed(
+    faucetUrl: string,
+    web3Address: string,
+    seed: Uint8Array
+  ): Promise<LineraConnection> {
+    try {
+      console.log('🔄 Connecting to Linera with Web3 wallet seed...');
+      
+      // Step 1: Initialize WASM
+      await ensureWasmInitialized();
+      
+      // Step 2: Dynamically load @linera/client
+      const lineraModule = await getLineraClient();
+      const { Faucet, Client, signer: signerModule } = lineraModule;
+      
+      // Step 3: Create faucet connection
+      console.log(`📡 Connecting to faucet: ${faucetUrl}`);
+      const faucet = new Faucet(faucetUrl);
+      
+      // Step 4: Create Linera wallet from faucet (gets genesis config)
+      console.log('👛 Creating Linera wallet...');
+      const wallet = await faucet.createWallet();
+      
+      // Step 5: Create DETERMINISTIC signer from seed
+      console.log('🔑 Creating deterministic signer from Web3 signature...');
+      const autoSigner = signerModule.PrivateKey.fromSeed(seed);
+      const autoSignerAddress = autoSigner.address();
+      console.log(`   Linera address: ${autoSignerAddress}`);
+      
+      // Step 6: Check if we already have a chain for this address
+      // First, try to check localStorage for stored chain
+      const storedChainId = localStorage.getItem(`linera_chain_${web3Address}`);
+      let chainId: string;
+      
+      if (storedChainId) {
+        console.log(`📂 Found stored chain ID: ${storedChainId.slice(0, 16)}...`);
+        chainId = storedChainId;
+        
+        // We need to add this chain to the wallet
+        // The wallet from faucet doesn't know about our old chain
+        try {
+          // Try to set owner for this chain (this may fail if chain doesn't exist)
+          await wallet.setOwner(chainId, autoSignerAddress);
+          console.log('✅ Reconnected to existing chain!');
+        } catch (e) {
+          console.log('⚠️ Could not reconnect to stored chain, claiming new one...');
+          chainId = await faucet.claimChain(wallet, autoSignerAddress);
+          localStorage.setItem(`linera_chain_${web3Address}`, chainId);
+          console.log(`✅ Claimed new chain: ${chainId}`);
+        }
+      } else {
+        // Claim a new microchain for this address
+        console.log(`⛓️ Claiming microchain for Linera address...`);
+        chainId = await faucet.claimChain(wallet, autoSignerAddress);
+        localStorage.setItem(`linera_chain_${web3Address}`, chainId);
+        console.log(`✅ Claimed chain: ${chainId}`);
+      }
+      
+      // Step 7: Create Linera client with deterministic signer
+      console.log('🔗 Creating Linera client...');
+      const client = await new Client(wallet, autoSigner);
+      
+      // Step 8: Set signer as default owner in wallet
+      console.log('⛓️ Configuring wallet...');
+      try {
+        await wallet.setOwner(chainId, autoSignerAddress);
+        console.log('✅ Wallet configured!');
+      } catch (setOwnerError) {
+        console.warn('⚠️ Could not set default owner:', setOwnerError);
+      }
+      
+      // Store connection
+      this.connection = {
+        client,
+        wallet,
+        faucet,
+        chainId,
+        address: web3Address,
+        autoSignerAddress,
+      };
+      
+      console.log('✅ Connected to Linera with persistent identity!');
+      console.log(`   Web3 Address: ${web3Address}`);
+      console.log(`   Linera Address: ${autoSignerAddress}`);
+      console.log(`   Chain ID: ${chainId}`);
+      
+      this.notifyListeners();
+      return this.connection;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('❌ Failed to connect to Linera:', message);
+      this.connection = null;
+      this.notifyListeners();
+      throw error;
+    }
+  }
+
+  /**
    * Connect to Linera network
    * 
    * This will:
