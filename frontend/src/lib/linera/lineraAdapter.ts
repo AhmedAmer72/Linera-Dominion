@@ -45,9 +45,12 @@ const DEFAULT_FAUCET_URL = typeof window !== 'undefined'
   ? (process.env.NEXT_PUBLIC_LINERA_FAUCET_URL || 'https://faucet.testnet-conway.linera.net')
   : 'https://faucet.testnet-conway.linera.net';
 
+// Default Application ID - update this when redeploying contract
+const DEFAULT_APP_ID = '441310d20f19153c90b5b13974b02ffcedd98d74614afec6ea208061c332cc9d';
+
 const APPLICATION_ID = typeof window !== 'undefined'
-  ? (process.env.NEXT_PUBLIC_APP_ID || process.env.NEXT_PUBLIC_LINERA_APP_ID || '')
-  : '';
+  ? (process.env.NEXT_PUBLIC_APP_ID || process.env.NEXT_PUBLIC_LINERA_APP_ID || DEFAULT_APP_ID)
+  : DEFAULT_APP_ID;
 
 // Log configuration at module load for debugging (client-side only)
 if (typeof window !== 'undefined') {
