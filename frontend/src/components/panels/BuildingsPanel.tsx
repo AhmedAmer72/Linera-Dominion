@@ -117,7 +117,8 @@ const categories = [
 ];
 
 export function BuildingsPanel() {
-  const { buildings, resources } = useGameStore();
+  const { buildings, resources, buildBuilding, homeX, homeY } = useGameStore();
+  const [isBuilding, setIsBuilding] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedBuilding, setSelectedBuilding] = useState<typeof buildingTypes[0] | null>(null);
 
@@ -263,14 +264,29 @@ export function BuildingsPanel() {
                     {/* Build Button */}
                     <motion.button
                       className={`w-full rounded-lg py-2 font-display text-sm font-bold uppercase tracking-wider transition-all ${
-                        affordable
+                        affordable && !isBuilding
                           ? 'bg-gradient-to-r from-nebula-600 to-nebula-500 text-white hover:from-nebula-500 hover:to-nebula-400'
                           : 'cursor-not-allowed bg-gray-800 text-gray-500'
                       }`}
-                      whileHover={affordable ? { scale: 1.02 } : {}}
-                      whileTap={affordable ? { scale: 0.98 } : {}}
+                      whileHover={affordable && !isBuilding ? { scale: 1.02 } : {}}
+                      whileTap={affordable && !isBuilding ? { scale: 0.98 } : {}}
+                      disabled={!affordable || isBuilding}
+                      onClick={async () => {
+                        if (!affordable || isBuilding) return;
+                        setIsBuilding(true);
+                        try {
+                          // Use homeX, homeY as base + offset based on building count
+                          const offsetX = buildings.filter(b => b.type === building.type).length;
+                          await buildBuilding(building.type, homeX + offsetX, homeY);
+                          console.log('✅ Building queued:', building.name);
+                        } catch (error) {
+                          console.error('❌ Build failed:', error);
+                        } finally {
+                          setIsBuilding(false);
+                        }
+                      }}
                     >
-                      {level > 0 ? `Upgrade to Level ${level + 1}` : 'Build'}
+                      {isBuilding ? 'Building...' : (level > 0 ? `Upgrade to Level ${level + 1}` : 'Build')}
                     </motion.button>
                   </div>
 

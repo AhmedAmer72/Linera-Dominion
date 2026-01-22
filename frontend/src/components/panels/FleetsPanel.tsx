@@ -328,7 +328,30 @@ function FleetStatusBadge({ status }: { status: string }) {
 }
 
 function BuildShipsModal({ onClose }: { onClose: () => void }) {
+  const { buildShips, fleets } = useGameStore();
   const [shipCounts, setShipCounts] = useState<Record<string, number>>({});
+  const [isBuilding, setIsBuilding] = useState(false);
+
+  const handleBuildShips = async () => {
+    const shipsToAdd = Object.entries(shipCounts)
+      .filter(([, count]) => count > 0)
+      .map(([type, quantity]) => ({ type, quantity }));
+    
+    if (shipsToAdd.length === 0) return;
+    
+    setIsBuilding(true);
+    try {
+      // Get first fleet id or use 1 as default
+      const fleetId = fleets[0]?.id || 1;
+      await buildShips(fleetId, shipsToAdd);
+      console.log('✅ Ships queued for construction');
+      onClose();
+    } catch (error) {
+      console.error('❌ Ship build failed:', error);
+    } finally {
+      setIsBuilding(false);
+    }
+  };
 
   return (
     <motion.div
@@ -384,14 +407,17 @@ function BuildShipsModal({ onClose }: { onClose: () => void }) {
             className="rounded-lg border border-gray-600 px-6 py-2 font-display font-bold text-gray-400 hover:border-gray-400 hover:text-white"
             onClick={onClose}
             whileHover={{ scale: 1.02 }}
+            disabled={isBuilding}
           >
             Cancel
           </motion.button>
           <motion.button
             className="btn-primary"
             whileHover={{ scale: 1.02 }}
+            onClick={handleBuildShips}
+            disabled={isBuilding}
           >
-            Create Fleet
+            {isBuilding ? 'Building...' : 'Build Ships'}
           </motion.button>
         </div>
       </motion.div>
@@ -400,8 +426,27 @@ function BuildShipsModal({ onClose }: { onClose: () => void }) {
 }
 
 function DeployFleetModal({ fleet, onClose }: { fleet: any; onClose: () => void }) {
+  const { sendFleet } = useGameStore();
   const [destX, setDestX] = useState('');
   const [destY, setDestY] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  const handleDeploy = async () => {
+    const x = parseInt(destX);
+    const y = parseInt(destY);
+    if (isNaN(x) || isNaN(y)) return;
+    
+    setIsSending(true);
+    try {
+      await sendFleet(fleet.id, x, y);
+      console.log('✅ Fleet deployed');
+      onClose();
+    } catch (error) {
+      console.error('❌ Fleet deployment failed:', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <motion.div
@@ -449,14 +494,17 @@ function DeployFleetModal({ fleet, onClose }: { fleet: any; onClose: () => void 
           <motion.button
             className="rounded-lg border border-gray-600 px-6 py-2 font-display font-bold text-gray-400"
             onClick={onClose}
+            disabled={isSending}
           >
             Cancel
           </motion.button>
           <motion.button
             className="btn-primary"
             whileHover={{ scale: 1.02 }}
+            onClick={handleDeploy}
+            disabled={isSending || !destX || !destY}
           >
-            Launch Fleet
+            {isSending ? 'Deploying...' : 'Launch Fleet'}
           </motion.button>
         </div>
       </motion.div>

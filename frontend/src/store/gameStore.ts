@@ -1,4 +1,48 @@
 import { create } from 'zustand';
+import { lineraAdapter } from '@/lib/linera';
+
+// Building type mapping for GraphQL enum
+const BUILDING_TYPE_MAP: Record<string, string> = {
+  MinerDrone: 'MINER_DRONE',
+  GasSiphon: 'GAS_SIPHON',
+  ChronosCollider: 'CHRONOS_COLLIDER',
+  Shipyard: 'SHIPYARD',
+  WarpGate: 'WARP_GATE',
+  PlanetaryShield: 'PLANETARY_SHIELD',
+  ResearchLab: 'RESEARCH_LAB',
+  Warehouse: 'WAREHOUSE',
+  OrbitalCannon: 'ORBITAL_CANNON',
+  SubspaceRelay: 'SUBSPACE_RELAY',
+};
+
+// Ship type mapping for GraphQL enum
+const SHIP_TYPE_MAP: Record<string, string> = {
+  Scout: 'SCOUT',
+  Fighter: 'FIGHTER',
+  Cruiser: 'CRUISER',
+  Battleship: 'BATTLESHIP',
+  Carrier: 'CARRIER',
+  Freighter: 'FREIGHTER',
+  Colonizer: 'COLONIZER',
+  MineLay: 'MINE_LAY',
+  Destroyer: 'DESTROYER',
+  Dreadnought: 'DREADNOUGHT',
+};
+
+// Technology mapping for GraphQL enum
+const TECHNOLOGY_MAP: Record<string, string> = {
+  AdvancedMining: 'ADVANCED_MINING',
+  ReinforcedHulls: 'REINFORCED_HULLS',
+  PlasmaWeapons: 'PLASMA_WEAPONS',
+  IonDrives: 'ION_DRIVES',
+  WarpTechnology: 'WARP_TECHNOLOGY',
+  ShieldHarmonics: 'SHIELD_HARMONICS',
+  NanoConstruction: 'NANO_CONSTRUCTION',
+  ExpandedCargoBays: 'EXPANDED_CARGO_BAYS',
+  LongRangeSensors: 'LONG_RANGE_SENSORS',
+  StealthSystems: 'STEALTH_SYSTEMS',
+  TemporalMechanics: 'TEMPORAL_MECHANICS',
+};
 
 export interface Resources {
   iron: number;
@@ -198,24 +242,132 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   disconnect: () => set({ chainId: null, appId: null, connected: false, walletError: null }),
   
-  // Game actions (will integrate with Linera GraphQL)
+  // Game actions (integrated with Linera GraphQL)
   buildBuilding: async (type, x, y) => {
-    // TODO: Call Linera GraphQL mutation
-    console.log('Building:', type, 'at', x, y);
+    const buildingType = BUILDING_TYPE_MAP[type] || type.toUpperCase();
+    console.log('🏗️ Building:', type, '(', buildingType, ') at', x, y);
+    
+    try {
+      const mutation = `
+        mutation Build($buildingType: BuildingType!, $x: Int!, $y: Int!) {
+          build(buildingType: $buildingType, x: $x, y: $y)
+        }
+      `;
+      
+      await lineraAdapter.mutate(mutation, {
+        buildingType,
+        x,
+        y,
+      });
+      
+      console.log('✅ Build request sent successfully');
+      
+      // Optimistically add building to UI
+      const newBuilding: Building = {
+        id: Date.now(),
+        type,
+        level: 1,
+        x,
+        y,
+        constructionEnd: Date.now() + 60000, // 60 seconds
+      };
+      
+      set((state) => ({
+        buildings: [...state.buildings, newBuilding],
+      }));
+    } catch (error) {
+      console.error('❌ Build failed:', error);
+      throw error;
+    }
   },
   
   buildShips: async (fleetId, ships) => {
-    // TODO: Call Linera GraphQL mutation
-    console.log('Building ships for fleet:', fleetId, ships);
+    console.log('🚀 Building ships for fleet:', fleetId, ships);
+    
+    try {
+      // Build each ship type
+      for (const ship of ships) {
+        const shipType = SHIP_TYPE_MAP[ship.type] || ship.type.toUpperCase();
+        
+        const mutation = `
+          mutation BuildShips($shipType: ShipType!, $quantity: Int!) {
+            buildShips(shipType: $shipType, quantity: $quantity)
+          }
+        `;
+        
+        await lineraAdapter.mutate(mutation, {
+          shipType,
+          quantity: ship.quantity,
+        });
+      }
+      
+      console.log('✅ Ship build request sent successfully');
+    } catch (error) {
+      console.error('❌ Ship build failed:', error);
+      throw error;
+    }
   },
   
   sendFleet: async (fleetId, destX, destY, cargo) => {
-    // TODO: Call Linera GraphQL mutation
-    console.log('Sending fleet:', fleetId, 'to', destX, destY);
+    console.log('🛸 Sending fleet:', fleetId, 'to', destX, destY);
+    
+    try {
+      const mutation = `
+        mutation SendFleet($fleetId: Int!, $destinationX: Int!, $destinationY: Int!) {
+          sendFleet(fleetId: $fleetId, destinationX: $destinationX, destinationY: $destinationY)
+        }
+      `;
+      
+      await lineraAdapter.mutate(mutation, {
+        fleetId,
+        destinationX: destX,
+        destinationY: destY,
+      });
+      
+      console.log('✅ Fleet sent successfully');
+      
+      // Update fleet status optimistically
+      set((state) => ({
+        fleets: state.fleets.map((fleet) =>
+          fleet.id === fleetId
+            ? { ...fleet, status: 'moving' as const, destinationX: destX, destinationY: destY }
+            : fleet
+        ),
+      }));
+    } catch (error) {
+      console.error('❌ Send fleet failed:', error);
+      throw error;
+    }
   },
   
   startResearch: async (technology) => {
-    // TODO: Call Linera GraphQL mutation
-    console.log('Starting research:', technology);
+    const tech = TECHNOLOGY_MAP[technology] || technology.toUpperCase();
+    console.log('🔬 Starting research:', technology, '(', tech, ')');
+    
+    try {
+      const mutation = `
+        mutation Research($technology: Technology!) {
+          research(technology: $technology)
+        }
+      `;
+      
+      await lineraAdapter.mutate(mutation, {
+        technology: tech,
+      });
+      
+      console.log('✅ Research started successfully');
+      
+      // Update research status optimistically
+      set((state) => ({
+        research: state.research.map((r) =>
+          r.technology === technology
+            ? { ...r, inProgress: true, completionTime: Date.now() + 300000 }
+            : r
+        ),
+      }));
+    } catch (error) {
+      console.error('❌ Research failed:', error);
+      throw error;
+    }
   },
 }));

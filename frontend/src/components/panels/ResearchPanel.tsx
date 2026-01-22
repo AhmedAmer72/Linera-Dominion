@@ -179,9 +179,10 @@ const categories = [
 ];
 
 export function ResearchPanel() {
-  const { research, resources } = useGameStore();
+  const { research, resources, startResearch } = useGameStore();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedTech, setSelectedTech] = useState<typeof technologies[0] | null>(null);
+  const [isResearchingNow, setIsResearchingNow] = useState(false);
 
   const filteredTechnologies = selectedCategory === 'all'
     ? technologies
@@ -397,17 +398,29 @@ export function ResearchPanel() {
                       {/* Research Button */}
                       <motion.button
                         className={`w-full rounded-lg py-2 font-display text-sm font-bold uppercase tracking-wider transition-all ${
-                          researching
+                          researching || isResearchingNow
                             ? 'cursor-not-allowed bg-gray-800 text-gray-500'
                             : canAfford
                             ? 'bg-gradient-to-r from-energy-600 to-energy-500 text-white hover:from-energy-500 hover:to-energy-400'
                             : 'cursor-not-allowed bg-gray-800 text-gray-500'
                         }`}
-                        whileHover={canAfford && !researching ? { scale: 1.02 } : {}}
-                        whileTap={canAfford && !researching ? { scale: 0.98 } : {}}
-                        disabled={!canAfford || researching}
+                        whileHover={canAfford && !researching && !isResearchingNow ? { scale: 1.02 } : {}}
+                        whileTap={canAfford && !researching && !isResearchingNow ? { scale: 0.98 } : {}}
+                        disabled={!canAfford || researching || isResearchingNow}
+                        onClick={async () => {
+                          if (!canAfford || researching || isResearchingNow) return;
+                          setIsResearchingNow(true);
+                          try {
+                            await startResearch(tech.id);
+                            console.log('✅ Research started:', tech.name);
+                          } catch (error) {
+                            console.error('❌ Research failed:', error);
+                          } finally {
+                            setIsResearchingNow(false);
+                          }
+                        }}
                       >
-                        {researching ? 'Researching...' : level > 0 ? `Upgrade to Lv.${level + 1}` : 'Research'}
+                        {isResearchingNow ? 'Starting...' : researching ? 'Researching...' : level > 0 ? `Upgrade to Lv.${level + 1}` : 'Research'}
                       </motion.button>
                     </>
                   )}
