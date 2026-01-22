@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -308,11 +308,15 @@ export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [modal, setModal] = useState<'settings' | 'about' | 'howtoplay' | 'connectwallet' | null>(null);
   const { connected, shortChainId, shortWeb3Address, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
+  const restoreAttemptedRef = useRef(false);
 
-  // Restore connection on mount
+  // Restore connection on mount (only once)
   useEffect(() => {
-    restoreConnection();
-  }, [restoreConnection]);
+    if (!restoreAttemptedRef.current) {
+      restoreAttemptedRef.current = true;
+      restoreConnection();
+    }
+  }, []); // Empty deps - only run once on mount
 
   const handleMenuClick = (id: string) => {
     switch (id) {

@@ -54,13 +54,10 @@ function LogoIcon() {
 
 // Connect Wallet Button
 function ConnectWalletButton() {
-  const { connected, shortChainId, shortWeb3Address, isConnecting, walletError, connectWallet, disconnectWallet, restoreConnection } = useWallet();
+  const { connected, shortChainId, shortWeb3Address, isConnecting, walletError, connectWallet, disconnectWallet } = useWallet();
   const [showDropdown, setShowDropdown] = useState(false);
   
-  // Restore connection on mount
-  useEffect(() => {
-    restoreConnection();
-  }, [restoreConnection]);
+  // Note: restoreConnection is called from MainMenu, no need to call it here again
 
   if (connected && shortWeb3Address) {
     return (

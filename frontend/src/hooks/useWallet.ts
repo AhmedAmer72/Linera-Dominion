@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useWeb3Wallet } from './useWeb3Wallet';
 
@@ -28,6 +28,9 @@ export function useWallet() {
   const [adapterLoaded, setAdapterLoaded] = useState(false);
   // Track Web3 address for display
   const [web3Address, setWeb3Address] = useState<string | null>(null);
+  // Track if we've already attempted restore
+  const restoreAttemptedRef = useRef(false);
+  const isRestoringRef = useRef(false);
 
   // Load the adapter on mount (client-side only)
   useEffect(() => {
@@ -142,52 +145,67 @@ export function useWallet() {
 
   /**
    * Restore connection from stored Web3 signature
+   * This should only be called once on mount
    */
   const restoreConnection = useCallback(async () => {
-    // Check if we have a stored Web3 session
-    const storedSession = web3Wallet.checkStoredSession();
-    
-    if (storedSession) {
-      console.log('📂 Found stored Web3 session, reconnecting...');
-      setWeb3Address(storedSession.address);
-      
-      // Auto-reconnect with stored seed
-      setConnecting(true);
-      try {
-        const { lineraAdapter } = await import('@/lib/linera');
-        const connection = await lineraAdapter.connectWithSeed(
-          storedSession.seed, 
-          storedSession.address
-        );
-        
-        const appId = lineraAdapter.getApplicationId();
-        setConnection(connection.chainId, appId);
-        
-        console.log('✅ Restored connection!');
-        console.log(`   Chain ID: ${connection.chainId}`);
-        
-        // Connect to application
-        if (appId) {
-          try {
-            await lineraAdapter.connectApplication(appId);
-            console.log('✅ Connected to Dominion application!');
-          } catch (appError) {
-            console.warn('⚠️ Could not connect to application:', appError);
-          }
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('❌ Failed to restore connection:', error);
-        web3Wallet.disconnect();
-        setWeb3Address(null);
-        return false;
-      } finally {
-        setConnecting(false);
-      }
+    // Prevent multiple restore attempts
+    if (restoreAttemptedRef.current || isRestoringRef.current) {
+      console.log('⏭️ Restore already attempted or in progress, skipping...');
+      return false;
     }
     
-    return false;
+    // Mark as attempting
+    restoreAttemptedRef.current = true;
+    isRestoringRef.current = true;
+    
+    try {
+      // Check if we have a stored Web3 session
+      const storedSession = web3Wallet.checkStoredSession();
+      
+      if (storedSession) {
+        console.log('📂 Found stored Web3 session, reconnecting...');
+        setWeb3Address(storedSession.address);
+        
+        // Auto-reconnect with stored seed
+        setConnecting(true);
+        try {
+          const { lineraAdapter } = await import('@/lib/linera');
+          const connection = await lineraAdapter.connectWithSeed(
+            storedSession.seed, 
+            storedSession.address
+          );
+          
+          const appId = lineraAdapter.getApplicationId();
+          setConnection(connection.chainId, appId);
+          
+          console.log('✅ Restored connection!');
+          console.log(`   Chain ID: ${connection.chainId}`);
+          
+          // Connect to application
+          if (appId) {
+            try {
+              await lineraAdapter.connectApplication(appId);
+              console.log('✅ Connected to Dominion application!');
+            } catch (appError) {
+              console.warn('⚠️ Could not connect to application:', appError);
+            }
+          }
+          
+          return true;
+        } catch (error) {
+          console.error('❌ Failed to restore connection:', error);
+          web3Wallet.disconnect();
+          setWeb3Address(null);
+          return false;
+        } finally {
+          setConnecting(false);
+        }
+      }
+      
+      return false;
+    } finally {
+      isRestoringRef.current = false;
+    }
   }, [web3Wallet, setConnecting, setConnection]);
 
   // Get shortened chain ID for display
