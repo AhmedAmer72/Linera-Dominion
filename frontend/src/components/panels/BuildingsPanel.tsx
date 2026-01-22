@@ -281,6 +281,13 @@ export function BuildingsPanel() {
                           console.log('✅ Building queued:', building.name);
                         } catch (error) {
                           console.error('❌ Build failed:', error);
+                          const message = error instanceof Error ? error.message : 'Build failed';
+                          // Show alert for connection issues
+                          if (message.includes('Connection lost') || message.includes('reconnect')) {
+                            alert('Connection lost! Please disconnect and reconnect your wallet.');
+                          } else {
+                            alert(`Build failed: ${message}`);
+                          }
                         } finally {
                           setIsBuilding(false);
                         }

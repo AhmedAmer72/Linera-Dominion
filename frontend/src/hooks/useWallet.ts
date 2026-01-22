@@ -124,19 +124,29 @@ export function useWallet() {
   }, [disconnect]);
 
   // Restore connection from localStorage on mount
-  const restoreConnection = useCallback(() => {
+  // IMPORTANT: We cannot truly restore the WASM connection - user must reconnect
+  const restoreConnection = useCallback(async () => {
     const savedChainId = localStorage.getItem('linera_chain_id');
     const wasConnected = localStorage.getItem('linera_connected');
+    const userAddress = localStorage.getItem('linera_user_address');
     
-    if (savedChainId && wasConnected === 'true') {
-      // Note: For full restoration, user would need to reconnect
-      // as the WASM client state isn't persisted
-      // We can show them as "connected" but they may need to reconnect for mutations
-      setConnection(savedChainId, process.env.NEXT_PUBLIC_APP_ID || '');
-      return true;
+    if (savedChainId && wasConnected === 'true' && userAddress) {
+      // WASM client state isn't persisted across page refreshes
+      // We need to actually reconnect, not just restore UI state
+      console.log('🔄 Previous session detected, attempting to reconnect...');
+      
+      // Clear the stale stored data first
+      localStorage.removeItem('linera_chain_id');
+      localStorage.removeItem('linera_connected');
+      localStorage.removeItem('linera_user_address');
+      
+      // Don't auto-reconnect - require user to click connect again
+      // This is because each session gets a NEW chain from the faucet
+      console.log('⚠️ Previous session expired. Please connect again for a new chain.');
+      return false;
     }
     return false;
-  }, [setConnection]);
+  }, []);
 
   // Get shortened chain ID for display
   const shortChainId = chainId 

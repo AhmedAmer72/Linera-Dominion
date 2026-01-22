@@ -289,8 +289,45 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error('Wallet not connected');
     }
     
+    // Check if lineraAdapter is actually connected (WASM client alive)
+    if (!lineraAdapter.isApplicationConnected()) {
+      throw new Error('Connection lost. Please reconnect your wallet.');
+    }
+    
     const buildingType = BUILDING_TYPE_MAP[type] || type.toUpperCase();
     console.log('🏗️ Building:', type, '(', buildingType, ') at', x, y);
+    
+    // Calculate the cost based on current level
+    const existingBuilding = get().buildings.find(b => b.type === type);
+    const currentLevel = existingBuilding?.level || 0;
+    const costMultiplier = currentLevel + 1;
+    
+    // Get base costs from building types
+    const baseCosts: Record<string, { iron: number; deuterium: number; crystals: number }> = {
+      MinerDrone: { iron: 100, deuterium: 50, crystals: 0 },
+      GasSiphon: { iron: 150, deuterium: 25, crystals: 10 },
+      ChronosCollider: { iron: 500, deuterium: 200, crystals: 50 },
+      Shipyard: { iron: 300, deuterium: 100, crystals: 25 },
+      WarpGate: { iron: 1000, deuterium: 500, crystals: 100 },
+      ResearchLab: { iron: 400, deuterium: 200, crystals: 75 },
+      PlanetaryShield: { iron: 600, deuterium: 300, crystals: 150 },
+      OrbitalCannon: { iron: 800, deuterium: 400, crystals: 100 },
+    };
+    
+    const cost = baseCosts[type] || { iron: 100, deuterium: 50, crystals: 0 };
+    const totalCost = {
+      iron: cost.iron * costMultiplier,
+      deuterium: cost.deuterium * costMultiplier,
+      crystals: cost.crystals * costMultiplier,
+    };
+    
+    // Check if we can afford
+    const resources = get().resources;
+    if (resources.iron < totalCost.iron || 
+        resources.deuterium < totalCost.deuterium || 
+        resources.crystals < totalCost.crystals) {
+      throw new Error('Not enough resources');
+    }
     
     try {
       const mutation = `
@@ -307,9 +344,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       console.log('✅ Build request sent successfully');
       
-      // Check if this building type already exists (upgrade case)
-      const existingBuilding = get().buildings.find(b => b.type === type);
+      // Deduct resources optimistically
+      set((state) => ({
+        resources: {
+          iron: state.resources.iron - totalCost.iron,
+          deuterium: state.resources.deuterium - totalCost.deuterium,
+          crystals: state.resources.crystals - totalCost.crystals,
+        },
+      }));
+      console.log(`💰 Deducted resources: Iron -${totalCost.iron}, Deuterium -${totalCost.deuterium}, Crystals -${totalCost.crystals}`);
       
+      // Update building state
       if (existingBuilding) {
         // Upgrade existing building
         set((state) => ({
@@ -319,7 +364,7 @@ export const useGameStore = create<GameState>((set, get) => ({
               : b
           ),
         }));
-        console.log(`✅ Upgraded ${type} to level ${existingBuilding.level + 1}`);
+        console.log(`✅ Upgraded ${type} to level ${currentLevel + 1}`);
       } else {
         // Add new building
         const newBuilding: Building = {
@@ -336,6 +381,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         }));
         console.log(`✅ Built new ${type} at level 1`);
       }
+      
+      // Update resource rates after building
+      const updatedBuildings = get().buildings;
+      const minerLevel = updatedBuildings.find(b => b.type === 'MinerDrone')?.level || 0;
+      const siphonLevel = updatedBuildings.find(b => b.type === 'GasSiphon')?.level || 0;
+      const colliderLevel = updatedBuildings.find(b => b.type === 'ChronosCollider')?.level || 0;
+      
+      set({
+        resourceRates: {
+          iron: 50 * minerLevel,
+          deuterium: 30 * siphonLevel,
+          crystals: 10 * colliderLevel,
+        },
+      });
     } catch (error) {
       console.error('❌ Build failed:', error);
       throw error;
@@ -348,7 +407,45 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error('Wallet not connected');
     }
     
+    // Check if lineraAdapter is actually connected (WASM client alive)
+    if (!lineraAdapter.isApplicationConnected()) {
+      throw new Error('Connection lost. Please reconnect your wallet.');
+    }
+    
     console.log('🚀 Building ships for fleet:', fleetId, ships);
+    
+    // Ship costs
+    const shipCosts: Record<string, { iron: number; deuterium: number; crystals: number }> = {
+      Scout: { iron: 200, deuterium: 50, crystals: 0 },
+      Fighter: { iron: 500, deuterium: 150, crystals: 25 },
+      Cruiser: { iron: 1500, deuterium: 500, crystals: 100 },
+      Battleship: { iron: 5000, deuterium: 2000, crystals: 500 },
+      Carrier: { iron: 8000, deuterium: 4000, crystals: 1000 },
+      Freighter: { iron: 1000, deuterium: 500, crystals: 50 },
+      Colonizer: { iron: 10000, deuterium: 5000, crystals: 2000 },
+      Destroyer: { iron: 3000, deuterium: 1000, crystals: 200 },
+      Dreadnought: { iron: 20000, deuterium: 10000, crystals: 5000 },
+    };
+    
+    // Calculate total cost
+    let totalIron = 0;
+    let totalDeuterium = 0;
+    let totalCrystals = 0;
+    
+    for (const ship of ships) {
+      const cost = shipCosts[ship.type] || { iron: 200, deuterium: 50, crystals: 0 };
+      totalIron += cost.iron * ship.quantity;
+      totalDeuterium += cost.deuterium * ship.quantity;
+      totalCrystals += cost.crystals * ship.quantity;
+    }
+    
+    // Check if we can afford
+    const resources = get().resources;
+    if (resources.iron < totalIron || 
+        resources.deuterium < totalDeuterium || 
+        resources.crystals < totalCrystals) {
+      throw new Error('Not enough resources');
+    }
     
     try {
       // Build each ship type
@@ -368,6 +465,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       
       console.log('✅ Ship build request sent successfully');
+      
+      // Deduct resources optimistically
+      set((state) => ({
+        resources: {
+          iron: state.resources.iron - totalIron,
+          deuterium: state.resources.deuterium - totalDeuterium,
+          crystals: state.resources.crystals - totalCrystals,
+        },
+      }));
+      console.log(`💰 Deducted resources: Iron -${totalIron}, Deuterium -${totalDeuterium}, Crystals -${totalCrystals}`);
       
       // Update frontend state - add ships to fleet or create new fleet
       set((state) => {
@@ -416,6 +523,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error('Wallet not connected');
     }
     
+    // Check if lineraAdapter is actually connected (WASM client alive)
+    if (!lineraAdapter.isApplicationConnected()) {
+      throw new Error('Connection lost. Please reconnect your wallet.');
+    }
+    
     console.log('🛸 Sending fleet:', fleetId, 'to', destX, destY);
     
     try {
@@ -453,6 +565,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error('Wallet not connected');
     }
     
+    // Check if lineraAdapter is actually connected (WASM client alive)
+    if (!lineraAdapter.isApplicationConnected()) {
+      throw new Error('Connection lost. Please reconnect your wallet.');
+    }
+    
     const tech = TECHNOLOGY_MAP[technology] || technology.toUpperCase();
     console.log('🔬 Starting research:', technology, '(', tech, ')');
     
@@ -487,6 +604,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Check wallet connection
     if (!get().connected) {
       console.log('⚠️ Cannot refresh - wallet not connected');
+      return;
+    }
+    
+    // Check if lineraAdapter is actually connected (WASM client alive)
+    if (!lineraAdapter.isApplicationConnected()) {
+      console.log('⚠️ Cannot refresh - application not connected');
       return;
     }
     
