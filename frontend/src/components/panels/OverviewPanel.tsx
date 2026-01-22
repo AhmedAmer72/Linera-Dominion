@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 // Icon component with fallback
@@ -26,7 +26,28 @@ function GameIcon({ src, fallback, size = 64 }: { src: string; fallback: string;
 }
 
 export function OverviewPanel() {
-  const { buildings, fleets, research, resources } = useGameStore();
+  const { buildings, fleets, research, resources, resourceRates, refreshGameState, connected } = useGameStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    if (!connected) return;
+    
+    const interval = setInterval(() => {
+      refreshGameState();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [connected, refreshGameState]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshGameState();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const stats = [
     { label: 'Buildings', value: buildings.length, icon: '🏗️', iconSrc: '/images/buildings/shipyard.png', color: 'nebula' },
@@ -39,15 +60,68 @@ export function OverviewPanel() {
     <div className="holo-panel h-full overflow-y-auto p-6">
       {/* Header */}
       <motion.div
-        className="mb-6"
+        className="mb-6 flex items-center justify-between"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h2 className="font-display text-3xl font-bold text-white">
-          Empire Overview
-        </h2>
-        <p className="mt-1 font-body text-gray-400">
-          Manage your galactic dominion
+        <div>
+          <h2 className="font-display text-3xl font-bold text-white">
+            Empire Overview
+          </h2>
+          <p className="mt-1 font-body text-gray-400">
+            Manage your galactic dominion
+          </p>
+        </div>
+        <motion.button
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-display text-sm font-bold transition-all ${
+            isRefreshing 
+              ? 'bg-gray-700 text-gray-400 cursor-wait'
+              : 'bg-gradient-to-r from-energy-600 to-energy-500 text-white hover:from-energy-500 hover:to-energy-400'
+          }`}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          whileHover={!isRefreshing ? { scale: 1.05 } : {}}
+          whileTap={!isRefreshing ? { scale: 0.95 } : {}}
+        >
+          <motion.span
+            animate={isRefreshing ? { rotate: 360 } : {}}
+            transition={{ duration: 1, repeat: isRefreshing ? Infinity : 0, ease: 'linear' }}
+          >
+            🔄
+          </motion.span>
+          {isRefreshing ? 'Syncing...' : 'Sync Resources'}
+        </motion.button>
+      </motion.div>
+
+      {/* Resource Production Rates */}
+      <motion.div
+        className="mb-6 rounded-lg border border-energy-500/30 bg-energy-500/10 p-4"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <h3 className="mb-3 font-display text-sm font-bold uppercase tracking-wider text-energy-400">
+          Production Rates (per hour)
+        </h3>
+        <div className="flex gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⛏️</span>
+            <span className="font-display text-lg text-white">+{resourceRates.iron}</span>
+            <span className="text-gray-400">Iron</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💧</span>
+            <span className="font-display text-lg text-white">+{resourceRates.deuterium}</span>
+            <span className="text-gray-400">Deuterium</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💎</span>
+            <span className="font-display text-lg text-white">+{resourceRates.crystals}</span>
+            <span className="text-gray-400">Crystals</span>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Build more Plasma Mines, Ore Processors, and Crystal Synthesizers to increase production!
         </p>
       </motion.div>
 

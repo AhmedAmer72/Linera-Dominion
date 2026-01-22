@@ -145,6 +145,7 @@ interface GameState {
   buildShips: (fleetId: number, ships: Ship[]) => Promise<void>;
   sendFleet: (fleetId: number, destX: number, destY: number, cargo?: Resources) => Promise<void>;
   startResearch: (technology: string) => Promise<void>;
+  refreshGameState: () => Promise<void>;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -306,19 +307,35 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       console.log('✅ Build request sent successfully');
       
-      // Optimistically add building to UI
-      const newBuilding: Building = {
-        id: Date.now(),
-        type,
-        level: 1,
-        x,
-        y,
-        constructionEnd: Date.now() + 60000, // 60 seconds
-      };
+      // Check if this building type already exists (upgrade case)
+      const existingBuilding = get().buildings.find(b => b.type === type);
       
-      set((state) => ({
-        buildings: [...state.buildings, newBuilding],
-      }));
+      if (existingBuilding) {
+        // Upgrade existing building
+        set((state) => ({
+          buildings: state.buildings.map(b => 
+            b.type === type 
+              ? { ...b, level: b.level + 1, constructionEnd: Date.now() + 60000 * (b.level + 1) }
+              : b
+          ),
+        }));
+        console.log(`✅ Upgraded ${type} to level ${existingBuilding.level + 1}`);
+      } else {
+        // Add new building
+        const newBuilding: Building = {
+          id: Date.now(),
+          type,
+          level: 1,
+          x,
+          y,
+          constructionEnd: Date.now() + 60000, // 60 seconds
+        };
+        
+        set((state) => ({
+          buildings: [...state.buildings, newBuilding],
+        }));
+        console.log(`✅ Built new ${type} at level 1`);
+      }
     } catch (error) {
       console.error('❌ Build failed:', error);
       throw error;
@@ -351,6 +368,42 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       
       console.log('✅ Ship build request sent successfully');
+      
+      // Update frontend state - add ships to fleet or create new fleet
+      set((state) => {
+        const existingFleet = state.fleets.find(f => f.id === fleetId);
+        
+        if (existingFleet) {
+          // Add ships to existing fleet
+          const updatedShips = [...existingFleet.ships];
+          for (const newShip of ships) {
+            const existing = updatedShips.find(s => s.type === newShip.type);
+            if (existing) {
+              existing.quantity += newShip.quantity;
+            } else {
+              updatedShips.push({ type: newShip.type, quantity: newShip.quantity });
+            }
+          }
+          return {
+            fleets: state.fleets.map(f => 
+              f.id === fleetId ? { ...f, ships: updatedShips } : f
+            ),
+          };
+        } else {
+          // Create new fleet with these ships
+          const newFleet: Fleet = {
+            id: fleetId || Date.now(),
+            name: `Fleet ${state.fleets.length + 1}`,
+            ships: ships.map(s => ({ type: s.type, quantity: s.quantity })),
+            status: 'idle',
+            x: state.homeX,
+            y: state.homeY,
+          };
+          return {
+            fleets: [...state.fleets, newFleet],
+          };
+        }
+      });
     } catch (error) {
       console.error('❌ Ship build failed:', error);
       throw error;
@@ -427,6 +480,73 @@ export const useGameStore = create<GameState>((set, get) => ({
     } catch (error) {
       console.error('❌ Research failed:', error);
       throw error;
+    }
+  },
+  
+  refreshGameState: async () => {
+    // Check wallet connection
+    if (!get().connected) {
+      console.log('⚠️ Cannot refresh - wallet not connected');
+      return;
+    }
+    
+    console.log('🔄 Refreshing game state from contract...');
+    
+    try {
+      const query = `
+        query {
+          name
+          homeX
+          homeY
+          iron
+          deuterium
+          crystals
+          buildingCount
+          fleetCount
+        }
+      `;
+      
+      const result = await lineraAdapter.query<{
+        name: string;
+        homeX: number;
+        homeY: number;
+        iron: number;
+        deuterium: number;
+        crystals: number;
+        buildingCount: number;
+        fleetCount: number;
+      }>(query);
+      
+      console.log('✅ Game state refreshed:', result);
+      
+      // Update resources from contract (resources accumulate over time based on buildings)
+      set({
+        playerName: result.name || get().playerName,
+        homeX: result.homeX || get().homeX,
+        homeY: result.homeY || get().homeY,
+        resources: {
+          iron: result.iron || 0,
+          deuterium: result.deuterium || 0,
+          crystals: result.crystals || 0,
+        },
+      });
+      
+      // Calculate production rates based on buildings
+      const buildings = get().buildings;
+      const minerLevel = buildings.find(b => b.type === 'MinerDrone')?.level || 0;
+      const siphonLevel = buildings.find(b => b.type === 'GasSiphon')?.level || 0;
+      const colliderLevel = buildings.find(b => b.type === 'ChronosCollider')?.level || 0;
+      
+      set({
+        resourceRates: {
+          iron: 50 * minerLevel,
+          deuterium: 30 * siphonLevel,
+          crystals: 10 * colliderLevel,
+        },
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to refresh game state:', error);
     }
   },
 }));
