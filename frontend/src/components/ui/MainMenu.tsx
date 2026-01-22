@@ -163,6 +163,11 @@ export function MainMenu({ onStart }: MainMenuProps) {
   const handleMenuClick = (id: string) => {
     switch (id) {
       case 'start':
+        if (!connected) {
+          // Show a prompt to connect wallet first
+          alert('Please connect your wallet first to play!');
+          return;
+        }
         onStart();
         break;
       case 'settings':
@@ -173,6 +178,14 @@ export function MainMenu({ onStart }: MainMenuProps) {
         break;
     }
   };
+
+  // Update menu items to show connection requirement
+  const getMenuItems = () => menuItems.map(item => {
+    if (item.id === 'start' && !connected) {
+      return { ...item, label: 'CONNECT TO PLAY' };
+    }
+    return item;
+  });
 
   return (
     <>
@@ -276,7 +289,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.6 }}
       >
-        {menuItems.map((item, index) => (
+        {getMenuItems().map((item, index) => (
           <motion.button
             key={item.id}
             className="group relative overflow-hidden"
@@ -285,7 +298,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
             transition={{ delay: 0.6 + index * 0.1, duration: 0.4 }}
             onHoverStart={() => setHoveredItem(item.id)}
             onHoverEnd={() => setHoveredItem(null)}
-            onClick={() => handleMenuClick(item.id)}
+            onClick={() => item.id === 'start' && !connected ? connectWallet() : handleMenuClick(item.id)}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
           >

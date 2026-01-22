@@ -148,58 +148,32 @@ interface GameState {
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
-  // Initial state
+  // Initial state - empty until wallet connects and fetches from contract
   gameState: 'menu',
-  playerName: 'Commander',
-  homeX: 100,
-  homeY: 200,
+  playerName: '',
+  homeX: 0,
+  homeY: 0,
   
   resources: {
-    iron: 10000,
-    deuterium: 5000,
-    crystals: 2500,
+    iron: 0,
+    deuterium: 0,
+    crystals: 0,
   },
   resourceRates: {
-    iron: 150,
-    deuterium: 75,
-    crystals: 25,
+    iron: 0,
+    deuterium: 0,
+    crystals: 0,
   },
   
-  buildings: [
-    { id: 1, type: 'MinerDrone', level: 3, x: 0, y: 0 },
-    { id: 2, type: 'GasSiphon', level: 2, x: 1, y: 0 },
-    { id: 3, type: 'Shipyard', level: 1, x: 2, y: 0 },
-    { id: 4, type: 'ResearchLab', level: 1, x: 0, y: 1 },
-  ],
+  buildings: [],
   
-  fleets: [
-    {
-      id: 1,
-      name: 'Alpha Squadron',
-      ships: [
-        { type: 'Scout', quantity: 5 },
-        { type: 'Fighter', quantity: 10 },
-        { type: 'Cruiser', quantity: 2 },
-      ],
-      status: 'idle',
-      x: 100,
-      y: 200,
-    },
-  ],
+  fleets: [],
   
-  research: [
-    { technology: 'AdvancedMining', level: 1, inProgress: false },
-    { technology: 'ReinforcedHulls', level: 0, inProgress: false },
-    { technology: 'PlasmaWeapons', level: 0, inProgress: true, completionTime: Date.now() + 300000 },
-  ],
+  research: [],
   
   currentSectorX: 0,
   currentSectorY: 0,
-  knownPlanets: [
-    { id: 1, name: 'Home World', x: 100, y: 200, type: 'rocky', owner: 'player', resources: { iron: 5000, deuterium: 2000, crystals: 500 } },
-    { id: 2, name: 'Alpha Prime', x: 105, y: 195, type: 'gas', resources: { iron: 0, deuterium: 10000, crystals: 0 } },
-    { id: 3, name: 'Crystal Moon', x: 98, y: 210, type: 'ice', resources: { iron: 1000, deuterium: 500, crystals: 5000 } },
-  ],
+  knownPlanets: [],
   
   selectedPanel: null,
   selectedFleetId: null,
@@ -212,8 +186,73 @@ export const useGameStore = create<GameState>((set, get) => ({
   walletError: null,
   
   // Actions
-  initializeGame: () => {
-    set({ gameState: 'playing', selectedPanel: 'overview' });
+  initializeGame: async () => {
+    const state = get();
+    
+    // Require wallet connection before playing
+    if (!state.connected) {
+      console.log('⚠️ Wallet not connected - cannot start game');
+      set({ walletError: 'Please connect your wallet first' });
+      return;
+    }
+    
+    // Fetch initial state from contract
+    try {
+      console.log('📡 Fetching game state from contract...');
+      const query = `
+        query {
+          name
+          homeX
+          homeY
+          iron
+          deuterium
+          crystals
+          buildingCount
+          fleetCount
+        }
+      `;
+      
+      const result = await lineraAdapter.query<{
+        name: string;
+        homeX: number;
+        homeY: number;
+        iron: number;
+        deuterium: number;
+        crystals: number;
+        buildingCount: number;
+        fleetCount: number;
+      }>(query);
+      
+      console.log('✅ Game state fetched:', result);
+      
+      set({
+        gameState: 'playing',
+        selectedPanel: 'overview',
+        playerName: result.name || 'Commander',
+        homeX: result.homeX || 100,
+        homeY: result.homeY || 100,
+        resources: {
+          iron: result.iron || 500,
+          deuterium: result.deuterium || 200,
+          crystals: result.crystals || 50,
+        },
+      });
+    } catch (error) {
+      console.error('❌ Failed to fetch game state:', error);
+      // Start with default values if fetch fails
+      set({
+        gameState: 'playing',
+        selectedPanel: 'overview',
+        playerName: 'Commander',
+        homeX: 100,
+        homeY: 100,
+        resources: {
+          iron: 500,
+          deuterium: 200,
+          crystals: 50,
+        },
+      });
+    }
   },
   
   setGameState: (gameState) => set({ gameState }),
@@ -244,6 +283,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   // Game actions (integrated with Linera GraphQL)
   buildBuilding: async (type, x, y) => {
+    // Check wallet connection
+    if (!get().connected) {
+      throw new Error('Wallet not connected');
+    }
+    
     const buildingType = BUILDING_TYPE_MAP[type] || type.toUpperCase();
     console.log('🏗️ Building:', type, '(', buildingType, ') at', x, y);
     
@@ -282,6 +326,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   
   buildShips: async (fleetId, ships) => {
+    // Check wallet connection
+    if (!get().connected) {
+      throw new Error('Wallet not connected');
+    }
+    
     console.log('🚀 Building ships for fleet:', fleetId, ships);
     
     try {
@@ -309,6 +358,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   
   sendFleet: async (fleetId, destX, destY, cargo) => {
+    // Check wallet connection
+    if (!get().connected) {
+      throw new Error('Wallet not connected');
+    }
+    
     console.log('🛸 Sending fleet:', fleetId, 'to', destX, destY);
     
     try {
@@ -341,6 +395,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   
   startResearch: async (technology) => {
+    // Check wallet connection
+    if (!get().connected) {
+      throw new Error('Wallet not connected');
+    }
+    
     const tech = TECHNOLOGY_MAP[technology] || technology.toUpperCase();
     console.log('🔬 Starting research:', technology, '(', tech, ')');
     
