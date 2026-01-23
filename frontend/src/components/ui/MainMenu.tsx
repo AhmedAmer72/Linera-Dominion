@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -307,16 +307,10 @@ const menuItems = [
 export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [modal, setModal] = useState<'settings' | 'about' | 'howtoplay' | 'connectwallet' | null>(null);
-  const { connected, shortChainId, shortWeb3Address, isConnecting, connectWallet, disconnectWallet, restoreConnection } = useWallet();
-  const restoreAttemptedRef = useRef(false);
+  const { connected, shortChainId, shortWeb3Address, isConnecting, connectWallet, disconnectWallet } = useWallet();
 
-  // Restore connection on mount (only once)
-  useEffect(() => {
-    if (!restoreAttemptedRef.current) {
-      restoreAttemptedRef.current = true;
-      restoreConnection();
-    }
-  }, []); // Empty deps - only run once on mount
+  // NOTE: Auto-restore removed - users must manually click Connect
+  // This ensures better UX where users control when wallet connects
 
   const handleMenuClick = (id: string) => {
     switch (id) {

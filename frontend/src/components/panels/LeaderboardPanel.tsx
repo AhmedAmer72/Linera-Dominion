@@ -6,7 +6,7 @@ import { getLeaderboard, getPlayerRank, LeaderboardEntry, PlayerRank } from '@/l
 import { useGameStore } from '@/store/gameStore';
 
 interface LeaderboardPanelProps {
-  onClose?: () => void;
+  onClose: () => void;
 }
 
 export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
@@ -17,12 +17,18 @@ export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const { web3Address } = useGameStore();
 
+  // Handle close with safety check
+  const handleClose = useCallback(() => {
+    console.log('🔒 Closing leaderboard panel');
+    onClose();
+  }, [onClose]);
+
   // Handle escape key to close
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && onClose) {
-      onClose();
+    if (e.key === 'Escape') {
+      handleClose();
     }
-  }, [onClose]);
+  }, [handleClose]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -71,7 +77,7 @@ export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -79,8 +85,8 @@ export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
     >
       {/* Backdrop */}
       <motion.div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-pointer"
+        onClick={handleClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -121,8 +127,11 @@ export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
             
             {/* Close button */}
             <motion.button
-              onClick={onClose}
-              className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-600/50 bg-void/50 text-gray-400 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400 transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClose();
+              }}
+              className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-600/50 bg-void/50 text-gray-400 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
@@ -300,8 +309,11 @@ export function LeaderboardPanel({ onClose }: LeaderboardPanelProps) {
             <span>👥 {leaderboard.length} commanders</span>
           </div>
           <motion.button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-nebula-500/20 border border-nebula-500/40 text-nebula-400 font-medium hover:bg-nebula-500/30 transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+            className="px-4 py-2 rounded-lg bg-nebula-500/20 border border-nebula-500/40 text-nebula-400 font-medium hover:bg-nebula-500/30 transition-all cursor-pointer"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >

@@ -76,6 +76,14 @@ export interface Fleet {
   destinationY?: number;
 }
 
+export interface InvasionRequirements {
+  minShips?: number;              // Minimum total ships required
+  requiredShipTypes?: { type: string; count: number }[];  // Specific ship types needed
+  minFleetPower?: number;         // Minimum fleet combat power
+  requiredTechnology?: string;    // Technology that must be researched
+  minBuildingLevel?: { building: string; level: number };  // Building level requirement
+}
+
 export interface Planet {
   id: number;
   name: string;
@@ -84,7 +92,197 @@ export interface Planet {
   type: 'rocky' | 'gas' | 'ice' | 'volcanic' | 'oceanic';
   owner?: string;
   resources: Resources;
+  difficulty: 'easy' | 'medium' | 'hard' | 'extreme';  // Planet difficulty
+  invasionRequirements?: InvasionRequirements;  // Requirements to invade
+  defenseFleet?: { type: string; count: number }[];  // Defending ships
+  description?: string;  // Planet lore/description
 }
+
+// ===================================
+// GALAXY PLANETS - Available for exploration/invasion
+// ===================================
+const INITIAL_GALAXY_PLANETS: Planet[] = [
+  // ===== EASY PLANETS (Nearby, low requirements) =====
+  {
+    id: 1001,
+    name: "Proxima Minor",
+    x: 3,
+    y: 2,
+    type: 'rocky',
+    owner: 'neutral',
+    resources: { iron: 5000, deuterium: 2000, crystals: 1500 },
+    difficulty: 'easy',
+    description: "A small rocky world with minimal defenses. Perfect for new commanders.",
+    invasionRequirements: {
+      minShips: 5,
+      requiredShipTypes: [{ type: 'Fighter', count: 3 }],
+    },
+    defenseFleet: [{ type: 'Fighter', count: 2 }],
+  },
+  {
+    id: 1002,
+    name: "Asteroid Haven",
+    x: -2,
+    y: 4,
+    type: 'rocky',
+    owner: 'neutral',
+    resources: { iron: 8000, deuterium: 1000, crystals: 3000 },
+    difficulty: 'easy',
+    description: "A resource-rich asteroid field converted into a mining colony.",
+    invasionRequirements: {
+      minShips: 8,
+      requiredShipTypes: [{ type: 'Scout', count: 2 }, { type: 'Fighter', count: 4 }],
+    },
+    defenseFleet: [{ type: 'Fighter', count: 4 }],
+  },
+  {
+    id: 1003,
+    name: "Glacius IV",
+    x: 4,
+    y: -3,
+    type: 'ice',
+    owner: 'neutral',
+    resources: { iron: 3000, deuterium: 8000, crystals: 2000 },
+    difficulty: 'easy',
+    description: "Frozen world with abundant deuterium reserves beneath the ice.",
+    invasionRequirements: {
+      minShips: 6,
+      requiredShipTypes: [{ type: 'Fighter', count: 5 }],
+    },
+    defenseFleet: [{ type: 'Fighter', count: 3 }, { type: 'Scout', count: 2 }],
+  },
+
+  // ===== MEDIUM PLANETS (Further out, moderate requirements) =====
+  {
+    id: 2001,
+    name: "Nova Forge",
+    x: -6,
+    y: -5,
+    type: 'volcanic',
+    owner: 'hostile',
+    resources: { iron: 15000, deuterium: 5000, crystals: 8000 },
+    difficulty: 'medium',
+    description: "A volcanic world rich in rare metals. Defended by hostile forces.",
+    invasionRequirements: {
+      minShips: 20,
+      requiredShipTypes: [{ type: 'Fighter', count: 10 }, { type: 'Cruiser', count: 2 }],
+      requiredTechnology: 'ReinforcedHulls',
+    },
+    defenseFleet: [{ type: 'Fighter', count: 8 }, { type: 'Cruiser', count: 1 }],
+  },
+  {
+    id: 2002,
+    name: "Azure Deep",
+    x: 7,
+    y: 5,
+    type: 'oceanic',
+    owner: 'hostile',
+    resources: { iron: 10000, deuterium: 12000, crystals: 6000 },
+    difficulty: 'medium',
+    description: "An ocean world with deep-sea crystal formations.",
+    invasionRequirements: {
+      minShips: 25,
+      requiredShipTypes: [{ type: 'Fighter', count: 12 }, { type: 'Cruiser', count: 3 }],
+      minBuildingLevel: { building: 'Shipyard', level: 3 },
+    },
+    defenseFleet: [{ type: 'Fighter', count: 10 }, { type: 'Cruiser', count: 2 }],
+  },
+  {
+    id: 2003,
+    name: "Titan's Rest",
+    x: -4,
+    y: 8,
+    type: 'gas',
+    owner: 'hostile',
+    resources: { iron: 8000, deuterium: 20000, crystals: 4000 },
+    difficulty: 'medium',
+    description: "A gas giant with rich deuterium clouds and orbital stations.",
+    invasionRequirements: {
+      minShips: 22,
+      requiredShipTypes: [{ type: 'Fighter', count: 8 }, { type: 'Cruiser', count: 4 }],
+      requiredTechnology: 'IonDrives',
+    },
+    defenseFleet: [{ type: 'Fighter', count: 12 }, { type: 'Cruiser', count: 2 }],
+  },
+
+  // ===== HARD PLANETS (Distant, significant requirements) =====
+  {
+    id: 3001,
+    name: "Obsidian Prime",
+    x: 10,
+    y: -8,
+    type: 'volcanic',
+    owner: 'hostile',
+    resources: { iron: 30000, deuterium: 15000, crystals: 20000 },
+    difficulty: 'hard',
+    description: "A fortress world guarded by a powerful fleet. Rich beyond measure.",
+    invasionRequirements: {
+      minShips: 50,
+      requiredShipTypes: [{ type: 'Cruiser', count: 8 }, { type: 'Battleship', count: 2 }],
+      requiredTechnology: 'PlasmaWeapons',
+      minBuildingLevel: { building: 'Shipyard', level: 5 },
+    },
+    defenseFleet: [{ type: 'Fighter', count: 20 }, { type: 'Cruiser', count: 8 }, { type: 'Battleship', count: 1 }],
+  },
+  {
+    id: 3002,
+    name: "Crystal Nebula",
+    x: -12,
+    y: 6,
+    type: 'ice',
+    owner: 'hostile',
+    resources: { iron: 15000, deuterium: 25000, crystals: 35000 },
+    difficulty: 'hard',
+    description: "A crystalline world with the largest crystal deposits in the sector.",
+    invasionRequirements: {
+      minShips: 55,
+      requiredShipTypes: [{ type: 'Cruiser', count: 10 }, { type: 'Battleship', count: 3 }],
+      requiredTechnology: 'ShieldHarmonics',
+      minBuildingLevel: { building: 'ResearchLab', level: 4 },
+    },
+    defenseFleet: [{ type: 'Fighter', count: 15 }, { type: 'Cruiser', count: 10 }, { type: 'Battleship', count: 2 }],
+  },
+
+  // ===== EXTREME PLANETS (End-game, maximum requirements) =====
+  {
+    id: 4001,
+    name: "Dread Citadel",
+    x: -15,
+    y: -12,
+    type: 'rocky',
+    owner: 'enemy_empire',
+    resources: { iron: 50000, deuterium: 40000, crystals: 45000 },
+    difficulty: 'extreme',
+    description: "The enemy empire's forward base. Only the strongest can hope to conquer it.",
+    invasionRequirements: {
+      minShips: 100,
+      minFleetPower: 5000,
+      requiredShipTypes: [{ type: 'Battleship', count: 5 }, { type: 'Dreadnought', count: 1 }],
+      requiredTechnology: 'WarpTechnology',
+      minBuildingLevel: { building: 'Shipyard', level: 8 },
+    },
+    defenseFleet: [{ type: 'Fighter', count: 30 }, { type: 'Cruiser', count: 15 }, { type: 'Battleship', count: 5 }, { type: 'Dreadnought', count: 1 }],
+  },
+  {
+    id: 4002,
+    name: "The Nexus",
+    x: 18,
+    y: 15,
+    type: 'gas',
+    owner: 'ancient',
+    resources: { iron: 60000, deuterium: 80000, crystals: 55000 },
+    difficulty: 'extreme',
+    description: "An ancient alien station at the heart of the galaxy. Legendary treasures await.",
+    invasionRequirements: {
+      minShips: 150,
+      minFleetPower: 8000,
+      requiredShipTypes: [{ type: 'Battleship', count: 8 }, { type: 'Dreadnought', count: 2 }, { type: 'Carrier', count: 1 }],
+      requiredTechnology: 'TemporalMechanics',
+      minBuildingLevel: { building: 'Shipyard', level: 10 },
+    },
+    defenseFleet: [{ type: 'Fighter', count: 50 }, { type: 'Cruiser', count: 20 }, { type: 'Battleship', count: 10 }, { type: 'Dreadnought', count: 3 }],
+  },
+];
 
 export interface Research {
   technology: string;
@@ -179,7 +377,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   currentSectorX: 0,
   currentSectorY: 0,
-  knownPlanets: [],
+  knownPlanets: INITIAL_GALAXY_PLANETS,
   
   selectedPanel: null,
   selectedFleetId: null,

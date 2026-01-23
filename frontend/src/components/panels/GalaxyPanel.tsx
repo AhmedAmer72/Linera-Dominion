@@ -260,6 +260,28 @@ export function GalaxyPanel() {
                     transition={{ duration: 1.5, repeat: Infinity }}
                   />
                 )}
+                {/* Hostile indicator */}
+                {(planet.owner === 'hostile' || planet.owner === 'enemy_empire') && (
+                  <motion.div
+                    className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.8, 1, 0.8],
+                    }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  />
+                )}
+                {/* Ancient indicator */}
+                {planet.owner === 'ancient' && (
+                  <motion.div
+                    className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-purple-500"
+                    animate={{
+                      scale: [1, 1.4, 1],
+                      opacity: [0.7, 1, 0.7],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                )}
               </motion.div>
 
               {/* Planet label */}
@@ -270,6 +292,20 @@ export function GalaxyPanel() {
                 <p className="font-display text-xs font-bold text-white" style={{ fontSize: 10 * zoom }}>
                   {planet.name}
                 </p>
+                {/* Difficulty indicator */}
+                {planet.difficulty && (
+                  <span 
+                    className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
+                      planet.difficulty === 'easy' ? 'bg-green-500/30 text-green-400' :
+                      planet.difficulty === 'medium' ? 'bg-yellow-500/30 text-yellow-400' :
+                      planet.difficulty === 'hard' ? 'bg-orange-500/30 text-orange-400' :
+                      'bg-red-500/30 text-red-400'
+                    }`}
+                    style={{ fontSize: 8 * zoom }}
+                  >
+                    {planet.difficulty}
+                  </span>
+                )}
               </div>
             </motion.div>
           );
@@ -347,6 +383,8 @@ export function GalaxyPanel() {
 }
 
 function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => void }) {
+  const { fleets, research, buildings } = useGameStore();
+  
   const planetColors = {
     rocky: '#8b7355',
     gas: '#e67e22',
@@ -355,9 +393,74 @@ function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => v
     oceanic: '#4169e1',
   };
 
+  const difficultyColors = {
+    easy: { bg: 'bg-green-500/20', border: 'border-green-500/50', text: 'text-green-400' },
+    medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-500/50', text: 'text-yellow-400' },
+    hard: { bg: 'bg-orange-500/20', border: 'border-orange-500/50', text: 'text-orange-400' },
+    extreme: { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400' },
+  };
+
+  // Check if player meets invasion requirements
+  const checkRequirements = () => {
+    if (!planet.invasionRequirements) return { met: true, missing: [] };
+    
+    const req = planet.invasionRequirements;
+    const missing: string[] = [];
+    
+    // Count total ships across all fleets
+    const totalShips = fleets.reduce((sum, fleet) => 
+      sum + fleet.ships.reduce((s, ship) => s + ship.quantity, 0), 0);
+    
+    // Count ships by type
+    const shipCounts: Record<string, number> = {};
+    fleets.forEach(fleet => {
+      fleet.ships.forEach(ship => {
+        shipCounts[ship.type] = (shipCounts[ship.type] || 0) + ship.quantity;
+      });
+    });
+    
+    // Check minimum ships
+    if (req.minShips && totalShips < req.minShips) {
+      missing.push(`Need ${req.minShips} ships (have ${totalShips})`);
+    }
+    
+    // Check required ship types
+    if (req.requiredShipTypes) {
+      req.requiredShipTypes.forEach((r: { type: string; count: number }) => {
+        const have = shipCounts[r.type] || 0;
+        if (have < r.count) {
+          missing.push(`Need ${r.count}x ${r.type} (have ${have})`);
+        }
+      });
+    }
+    
+    // Check required technology
+    if (req.requiredTechnology) {
+      const hasTech = research.some(r => r.technology === req.requiredTechnology && r.level > 0);
+      if (!hasTech) {
+        missing.push(`Requires ${req.requiredTechnology} research`);
+      }
+    }
+    
+    // Check building level
+    if (req.minBuildingLevel) {
+      const building = buildings.find(b => b.type === req.minBuildingLevel.building);
+      const level = building?.level || 0;
+      if (level < req.minBuildingLevel.level) {
+        missing.push(`Need ${req.minBuildingLevel.building} Level ${req.minBuildingLevel.level} (have ${level})`);
+      }
+    }
+    
+    return { met: missing.length === 0, missing };
+  };
+
+  const requirements = checkRequirements();
+  const difficulty = planet.difficulty || 'medium';
+  const diffStyle = difficultyColors[difficulty as keyof typeof difficultyColors];
+
   return (
     <motion.div
-      className="absolute bottom-20 left-6 right-6 z-10 rounded-xl border border-nebula-500/50 bg-void/95 p-4 backdrop-blur-md"
+      className="absolute bottom-20 left-6 right-6 z-10 rounded-xl border border-nebula-500/50 bg-void/95 p-4 backdrop-blur-md max-h-[60vh] overflow-y-auto custom-scrollbar"
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 50 }}
@@ -374,15 +477,20 @@ function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => v
             transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
           />
           <div>
-            <h3 className="font-display text-xl font-bold text-white">{planet.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-xl font-bold text-white">{planet.name}</h3>
+              <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${diffStyle.bg} ${diffStyle.border} ${diffStyle.text} border`}>
+                {difficulty}
+              </span>
+            </div>
             <p className="font-body text-sm text-gray-400 capitalize">{planet.type} Planet</p>
             <p className="font-body text-xs text-gray-500">
-              Coordinates: ({planet.x}, {planet.y})
+              Coordinates: ({planet.x}, {planet.y}) • Owner: {planet.owner || 'Unknown'}
             </p>
           </div>
         </div>
         <motion.button
-          className="text-gray-400 hover:text-white"
+          className="text-gray-400 hover:text-white cursor-pointer"
           onClick={onClose}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -391,6 +499,14 @@ function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => v
         </motion.button>
       </div>
 
+      {/* Description */}
+      {planet.description && (
+        <p className="mt-3 text-sm text-gray-400 italic border-l-2 border-nebula-500/50 pl-3">
+          {planet.description}
+        </p>
+      )}
+
+      {/* Resources */}
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="rounded-lg border border-gray-700 bg-void/50 p-3">
           <p className="font-body text-xs text-gray-400">Iron Deposits</p>
@@ -412,20 +528,126 @@ function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => v
         </div>
       </div>
 
+      {/* Defense Fleet */}
+      {planet.defenseFleet && planet.defenseFleet.length > 0 && (
+        <div className="mt-4">
+          <h4 className="font-display text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
+            <span>⚔️</span> Defense Fleet
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {planet.defenseFleet.map((ship: { type: string; count: number }, i: number) => (
+              <span key={i} className="px-2 py-1 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+                {ship.count}x {ship.type}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Invasion Requirements */}
+      {planet.invasionRequirements && planet.owner !== 'player' && (
+        <div className="mt-4">
+          <h4 className="font-display text-sm font-bold text-nebula-400 mb-2 flex items-center gap-2">
+            <span>📋</span> Invasion Requirements
+          </h4>
+          
+          {/* Required Ships */}
+          {planet.invasionRequirements.requiredShipTypes && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-500 mb-1">Required Ships:</p>
+              <div className="flex flex-wrap gap-2">
+                {planet.invasionRequirements.requiredShipTypes.map((ship: { type: string; count: number }, i: number) => {
+                  const have = fleets.reduce((sum, fleet) => 
+                    sum + fleet.ships.filter(s => s.type === ship.type).reduce((s, sh) => s + sh.quantity, 0), 0);
+                  const met = have >= ship.count;
+                  return (
+                    <span 
+                      key={i} 
+                      className={`px-2 py-1 rounded text-xs font-mono border ${
+                        met 
+                          ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                          : 'bg-gray-800 border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      {ship.count}x {ship.type} {met ? '✓' : `(${have})`}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Min Total Ships */}
+          {planet.invasionRequirements.minShips && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-500">
+                Minimum Fleet Size: <span className="text-white font-mono">{planet.invasionRequirements.minShips} ships</span>
+              </p>
+            </div>
+          )}
+
+          {/* Required Technology */}
+          {planet.invasionRequirements.requiredTechnology && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-500">
+                Required Tech: <span className="text-plasma-400 font-mono">{planet.invasionRequirements.requiredTechnology}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Required Building Level */}
+          {planet.invasionRequirements.minBuildingLevel && (
+            <div className="mb-2">
+              <p className="text-xs text-gray-500">
+                Required Building: <span className="text-energy-400 font-mono">
+                  {planet.invasionRequirements.minBuildingLevel.building} Lv.{planet.invasionRequirements.minBuildingLevel.level}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* Status */}
+          <div className={`mt-3 p-2 rounded-lg border ${requirements.met ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+            {requirements.met ? (
+              <p className="text-green-400 text-sm font-bold flex items-center gap-2">
+                <span>✅</span> Ready to invade!
+              </p>
+            ) : (
+              <div>
+                <p className="text-red-400 text-sm font-bold flex items-center gap-2 mb-1">
+                  <span>❌</span> Requirements not met
+                </p>
+                <ul className="text-xs text-red-300/80 space-y-0.5">
+                  {requirements.missing.map((m, i) => (
+                    <li key={i}>• {m}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
       <div className="mt-4 flex gap-3">
         {planet.owner !== 'player' ? (
           <>
             <motion.button
-              className="btn-primary flex-1"
-              whileHover={{ scale: 1.02 }}
+              className={`flex-1 py-2 rounded-lg font-display font-bold transition-all ${
+                requirements.met 
+                  ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-500 hover:to-orange-500'
+                  : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+              }`}
+              whileHover={requirements.met ? { scale: 1.02 } : {}}
+              disabled={!requirements.met}
             >
-              Send Fleet
+              ⚔️ Invade Planet
             </motion.button>
             <motion.button
-              className="flex-1 rounded-lg border border-plasma-500 py-2 font-display font-bold text-plasma-400 hover:bg-plasma-500/10"
+              className="flex-1 rounded-lg border border-nebula-500 py-2 font-display font-bold text-nebula-400 hover:bg-nebula-500/10"
               whileHover={{ scale: 1.02 }}
             >
-              Colonize
+              🚀 Send Scout
             </motion.button>
           </>
         ) : (
