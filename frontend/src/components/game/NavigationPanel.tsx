@@ -34,7 +34,11 @@ const navItems = [
   { id: 'diplomacy', iconSrc: '/images/research/genetics.png', icon: '🤝', label: 'Diplomacy' },
 ] as const;
 
-export function NavigationPanel() {
+interface NavigationPanelProps {
+  onLeaderboard?: () => void;
+}
+
+export function NavigationPanel({ onLeaderboard }: NavigationPanelProps) {
   const { selectedPanel, setSelectedPanel } = useGameStore();
 
   return (
@@ -105,16 +109,27 @@ export function NavigationPanel() {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Help button */}
+      {/* Leaderboard button */}
       <motion.button
-        className="flex h-14 w-14 items-center justify-center rounded-lg border border-gray-700 bg-void/50 transition-all hover:border-energy-500/50"
+        className="group relative flex h-14 w-14 items-center justify-center rounded-lg border border-yellow-500/30 bg-yellow-500/10 transition-all hover:border-yellow-500 hover:bg-yellow-500/20"
         initial={{ opacity: 0, x: -50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.6 }}
         whileHover={{ scale: 1.1, x: 5 }}
         whileTap={{ scale: 0.95 }}
+        onClick={onLeaderboard}
       >
-        <NavIcon src="/images/research/shields.png" fallback="❓" alt="Help" />
+        <span className="text-2xl">🏆</span>
+        
+        {/* Tooltip */}
+        <motion.div
+          className="absolute left-full ml-3 whitespace-nowrap rounded bg-void/95 px-3 py-2 font-display text-sm font-bold text-white opacity-0 shadow-lg border border-yellow-500/30 group-hover:opacity-100 z-50"
+          initial={{ x: -10 }}
+          whileHover={{ x: 0 }}
+        >
+          Leaderboard
+          <div className="absolute left-0 top-1/2 -ml-1 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-yellow-500/30 bg-void/95" />
+        </motion.div>
       </motion.button>
     </div>
   );

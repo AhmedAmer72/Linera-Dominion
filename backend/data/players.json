@@ -1,0 +1,36 @@
+{
+  "players": {
+    "0xa2ed7cafa4ce4b9d24aead6e47eee1ca5b2c816a": {
+      "address": "0xa2ed7cafa4ce4b9d24aead6e47eee1ca5b2c816a",
+      "playerName": "Commander",
+      "homeX": 100,
+      "homeY": 100,
+      "resources": {
+        "iron": 50,
+        "deuterium": 25,
+        "crystals": 40
+      },
+      "buildings": [
+        {
+          "id": 1769199255578,
+          "type": "MinerDrone",
+          "level": 2,
+          "x": 100,
+          "y": 100,
+          "constructionEnd": 1769199458056
+        },
+        {
+          "id": 1769199283048,
+          "type": "GasSiphon",
+          "level": 1,
+          "x": 100,
+          "y": 100,
+          "constructionEnd": 1769199343048
+        }
+      ],
+      "fleets": [],
+      "research": [],
+      "lastUpdated": 1769199338067
+    }
+  }
+}

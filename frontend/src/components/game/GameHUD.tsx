@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
 import { useGameStore } from '@/store/gameStore';
 import { ResourceBar } from './ResourceBar';
 import { NavigationPanel } from './NavigationPanel';
@@ -63,7 +62,7 @@ export function GameHUD() {
         animate={{ x: 0 }}
         transition={{ delay: 0.3, type: 'spring', stiffness: 100 }}
       >
-        <NavigationPanel />
+        <NavigationPanel onLeaderboard={() => setShowLeaderboard(true)} />
       </motion.div>
 
       {/* Main Content Panel */}
@@ -89,7 +88,7 @@ export function GameHUD() {
       >
         <div className="flex h-full flex-col gap-4">
           <MiniMap />
-          <QuickActions onLeaderboard={() => setShowLeaderboard(true)} />
+          <RecentActions />
           <EventLog />
         </div>
       </motion.div>
@@ -114,54 +113,75 @@ export function GameHUD() {
   );
 }
 
-// Action icon component with fallback
-function ActionIcon({ src, fallback, alt }: { src: string; fallback: string; alt: string }) {
-  const [imgError, setImgError] = useState(false);
+// Recent Actions - shows the last actions the user performed
+function RecentActions() {
+  const { buildings, fleets, research } = useGameStore();
   
-  if (imgError) {
-    return <span className="text-2xl">{fallback}</span>;
+  // Generate recent actions from game state
+  const recentActions: Array<{ icon: string; label: string; detail: string; time: string }> = [];
+  
+  // Add recent buildings (sorted by construction time or ID as proxy)
+  buildings.slice(-2).forEach(b => {
+    recentActions.push({
+      icon: '🏗️',
+      label: `Built ${b.type}`,
+      detail: `Level ${b.level}`,
+      time: 'Recent',
+    });
+  });
+  
+  // Add recent fleets
+  fleets.slice(-1).forEach(f => {
+    const totalShips = f.ships.reduce((sum, s) => sum + s.quantity, 0);
+    recentActions.push({
+      icon: '🚀',
+      label: f.name,
+      detail: `${totalShips} ships`,
+      time: 'Recent',
+    });
+  });
+  
+  // Add research in progress
+  research.filter(r => r.inProgress).forEach(r => {
+    recentActions.push({
+      icon: '🔬',
+      label: 'Researching',
+      detail: r.technology,
+      time: 'In Progress',
+    });
+  });
+  
+  // If no actions, show empty state
+  if (recentActions.length === 0) {
+    recentActions.push(
+      { icon: '💡', label: 'Build something', detail: 'Start your empire', time: '' },
+      { icon: '🚀', label: 'Create a fleet', detail: 'Explore the galaxy', time: '' },
+    );
   }
-  
-  return (
-    <Image
-      src={src}
-      alt={alt}
-      width={56}
-      height={56}
-      className="object-contain drop-shadow-lg"
-      onError={() => setImgError(true)}
-    />
-  );
-}
-
-function QuickActions({ onLeaderboard }: { onLeaderboard?: () => void }) {
-  const actions = [
-    { iconSrc: '/images/buildings/plasma-mine.png', icon: '🏗️', label: 'Build', color: 'nebula', onClick: undefined },
-    { iconSrc: '/images/ships/battlecruiser.png', icon: '🚀', label: 'Fleet', color: 'plasma', onClick: undefined },
-    { iconSrc: '/images/research/physics.png', icon: '🔬', label: 'Research', color: 'energy', onClick: undefined },
-    { iconSrc: '/images/resources/crystals.png', icon: '🏆', label: 'Leaderboard', color: 'nebula', onClick: onLeaderboard },
-  ];
 
   return (
     <div className="holo-panel p-4">
       <h3 className="mb-3 font-display text-xs font-bold uppercase tracking-wider text-gray-400">
-        Quick Actions
+        Recent Activity
       </h3>
-      <div className="grid grid-cols-2 gap-2">
-        {actions.map((action, i) => (
-          <motion.button
-            key={action.label}
-            className="flex flex-col items-center justify-center rounded border border-nebula-500/30 bg-void/50 p-3 transition-all hover:border-nebula-500 hover:bg-nebula-500/10"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+      <div className="space-y-2">
+        {recentActions.slice(0, 4).map((action, i) => (
+          <motion.div
+            key={i}
+            className="flex items-center gap-3 rounded border border-nebula-500/20 bg-void/30 p-2"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.6 + i * 0.1 }}
-            onClick={action.onClick}
           >
-            <ActionIcon src={action.iconSrc} fallback={action.icon} alt={action.label} />
-            <span className="mt-1 font-body text-xs text-gray-300">{action.label}</span>
-          </motion.button>
+            <span className="text-xl">{action.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-body text-xs text-white truncate">{action.label}</p>
+              <p className="font-body text-[10px] text-gray-500 truncate">{action.detail}</p>
+            </div>
+            {action.time && (
+              <span className="font-body text-[10px] text-gray-600">{action.time}</span>
+            )}
+          </motion.div>
         ))}
       </div>
     </div>
