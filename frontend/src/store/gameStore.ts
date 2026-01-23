@@ -831,12 +831,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       totalCrystals += cost.crystals * ship.quantity;
     }
     
-    // Check if we can afford
+    // Check if we can afford (use floor for resources since they tick as floats)
     const resources = get().resources;
-    if (resources.iron < totalIron || 
-        resources.deuterium < totalDeuterium || 
-        resources.crystals < totalCrystals) {
-      throw new Error('Not enough resources');
+    const availableIron = Math.floor(resources.iron);
+    const availableDeuterium = Math.floor(resources.deuterium);
+    const availableCrystals = Math.floor(resources.crystals);
+    
+    console.log(`💰 Ship cost: Iron ${totalIron}, Deuterium ${totalDeuterium}, Crystals ${totalCrystals}`);
+    console.log(`💰 Available: Iron ${availableIron}, Deuterium ${availableDeuterium}, Crystals ${availableCrystals}`);
+    
+    if (availableIron < totalIron || 
+        availableDeuterium < totalDeuterium || 
+        availableCrystals < totalCrystals) {
+      console.error(`❌ Not enough resources! Need: Iron ${totalIron}, Deut ${totalDeuterium}, Cryst ${totalCrystals}. Have: Iron ${availableIron}, Deut ${availableDeuterium}, Cryst ${availableCrystals}`);
+      throw new Error(`Not enough resources. Need: ${totalIron} Iron, ${totalDeuterium} Deuterium, ${totalCrystals} Crystals. Have: ${availableIron} Iron, ${availableDeuterium} Deuterium, ${availableCrystals} Crystals.`);
     }
     
     try {
@@ -1051,16 +1059,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       console.log('✅ Game state refreshed:', result);
       
-      // Update resources from contract (resources accumulate over time based on buildings)
+      // Get current local resources (may have accumulated while offline or through ticking)
+      const currentResources = get().resources;
+      const blockchainResources = {
+        iron: result.iron || 0,
+        deuterium: result.deuterium || 0,
+        crystals: result.crystals || 0,
+      };
+      
+      // Use MAX of local vs blockchain - never lose accumulated resources
+      // This prevents blockchain returning 0 from wiping local progress
+      const mergedResources = {
+        iron: Math.max(currentResources.iron, blockchainResources.iron),
+        deuterium: Math.max(currentResources.deuterium, blockchainResources.deuterium),
+        crystals: Math.max(currentResources.crystals, blockchainResources.crystals),
+      };
+      
+      console.log(`📊 Resources: Local(${Math.floor(currentResources.iron)}, ${Math.floor(currentResources.deuterium)}, ${Math.floor(currentResources.crystals)}) Blockchain(${blockchainResources.iron}, ${blockchainResources.deuterium}, ${blockchainResources.crystals}) -> Using(${Math.floor(mergedResources.iron)}, ${Math.floor(mergedResources.deuterium)}, ${Math.floor(mergedResources.crystals)})`);
+      
+      // Update state with merged resources
       set({
         playerName: result.name || get().playerName,
         homeX: result.homeX || get().homeX,
         homeY: result.homeY || get().homeY,
-        resources: {
-          iron: result.iron || 0,
-          deuterium: result.deuterium || 0,
-          crystals: result.crystals || 0,
-        },
+        resources: mergedResources,
       });
       
       // Calculate production rates based on buildings

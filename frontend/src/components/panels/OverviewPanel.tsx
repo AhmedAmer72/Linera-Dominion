@@ -27,27 +27,20 @@ function GameIcon({ src, fallback, size = 64 }: { src: string; fallback: string;
 
 export function OverviewPanel() {
   const { buildings, fleets, research, resources, resourceRates, refreshGameState, connected } = useGameStore();
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh from blockchain every 60 seconds (silent, in background)
   useEffect(() => {
     if (!connected) return;
     
+    // Initial refresh
+    refreshGameState().catch(() => {});
+    
     const interval = setInterval(() => {
-      refreshGameState();
-    }, 30000);
+      refreshGameState().catch(() => {});
+    }, 60000);
     
     return () => clearInterval(interval);
   }, [connected, refreshGameState]);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshGameState();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const stats = [
     { label: 'Buildings', value: buildings.length, icon: '🏗️', iconSrc: '/images/buildings/shipyard.png', color: 'nebula' },
@@ -72,25 +65,6 @@ export function OverviewPanel() {
             Manage your galactic dominion
           </p>
         </div>
-        <motion.button
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-display text-sm font-bold transition-all ${
-            isRefreshing 
-              ? 'bg-gray-700 text-gray-400 cursor-wait'
-              : 'bg-gradient-to-r from-energy-600 to-energy-500 text-white hover:from-energy-500 hover:to-energy-400'
-          }`}
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          whileHover={!isRefreshing ? { scale: 1.05 } : {}}
-          whileTap={!isRefreshing ? { scale: 0.95 } : {}}
-        >
-          <motion.span
-            animate={isRefreshing ? { rotate: 360 } : {}}
-            transition={{ duration: 1, repeat: isRefreshing ? Infinity : 0, ease: 'linear' }}
-          >
-            🔄
-          </motion.span>
-          {isRefreshing ? 'Syncing...' : 'Sync Resources'}
-        </motion.button>
       </motion.div>
 
       {/* Resource Production Rates */}
