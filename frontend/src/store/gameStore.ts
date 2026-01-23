@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { lineraAdapter } from '@/lib/linera';
+import { saveGameState, loadGameState } from '@/lib/persistence';
 
 // Building type mapping for GraphQL enum
 const BUILDING_TYPE_MAP: Record<string, string> = {
@@ -130,6 +131,8 @@ interface GameState {
   
   // Actions
   initializeGame: () => void;
+  loadPersistedState: () => void;
+  saveCurrentState: () => void;
   setGameState: (state: 'loading' | 'menu' | 'playing' | 'battle') => void;
   setResources: (resources: Resources) => void;
   addResources: (resources: Partial<Resources>) => void;
@@ -200,7 +203,46 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
     
-    // Fetch initial state from contract
+    // First, try to load persisted state from localStorage
+    if (state.web3Address) {
+      const persisted = loadGameState(state.web3Address);
+      if (persisted) {
+        console.log('📂 Restored game state from local storage');
+        set({
+          gameState: 'playing',
+          selectedPanel: 'overview',
+          playerName: persisted.playerName,
+          homeX: persisted.homeX,
+          homeY: persisted.homeY,
+          resources: persisted.resources,
+          resourceRates: persisted.resourceRates,
+          buildings: persisted.buildings,
+          fleets: persisted.fleets,
+          research: persisted.research,
+        });
+        
+        // Also try to fetch latest resources from blockchain
+        try {
+          const query = `query { iron deuterium crystals }`;
+          const result = await lineraAdapter.query<{ iron: number; deuterium: number; crystals: number }>(query);
+          if (result) {
+            set({
+              resources: {
+                iron: result.iron || persisted.resources.iron,
+                deuterium: result.deuterium || persisted.resources.deuterium,
+                crystals: result.crystals || persisted.resources.crystals,
+              },
+            });
+          }
+        } catch (e) {
+          console.log('⚠️ Could not fetch latest resources from blockchain, using cached values');
+        }
+        
+        return;
+      }
+    }
+    
+    // No persisted state - fetch from contract or use defaults
     try {
       console.log('📡 Fetching game state from contract...');
       const query = `
@@ -229,9 +271,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       console.log('✅ Game state fetched:', result);
       
-      set({
-        gameState: 'playing',
-        selectedPanel: 'overview',
+      const newState = {
+        gameState: 'playing' as const,
+        selectedPanel: 'overview' as const,
         playerName: result.name || 'Commander',
         homeX: result.homeX || 100,
         homeY: result.homeY || 100,
@@ -240,13 +282,25 @@ export const useGameStore = create<GameState>((set, get) => ({
           deuterium: result.deuterium || 200,
           crystals: result.crystals || 50,
         },
-      });
+      };
+      
+      set(newState);
+      
+      // Save initial state
+      if (state.web3Address) {
+        saveGameState(state.web3Address, {
+          playerName: newState.playerName,
+          homeX: newState.homeX,
+          homeY: newState.homeY,
+          resources: newState.resources,
+        });
+      }
     } catch (error) {
       console.error('❌ Failed to fetch game state:', error);
       // Start with default values if fetch fails
-      set({
-        gameState: 'playing',
-        selectedPanel: 'overview',
+      const defaultState = {
+        gameState: 'playing' as const,
+        selectedPanel: 'overview' as const,
         playerName: 'Commander',
         homeX: 100,
         homeY: 100,
@@ -255,13 +309,69 @@ export const useGameStore = create<GameState>((set, get) => ({
           deuterium: 200,
           crystals: 50,
         },
+      };
+      
+      set(defaultState);
+      
+      // Save default state
+      if (state.web3Address) {
+        saveGameState(state.web3Address, {
+          playerName: defaultState.playerName,
+          homeX: defaultState.homeX,
+          homeY: defaultState.homeY,
+          resources: defaultState.resources,
+        });
+      }
+    }
+  },
+  
+  // Load persisted state without starting the game
+  loadPersistedState: () => {
+    const state = get();
+    if (!state.web3Address) return;
+    
+    const persisted = loadGameState(state.web3Address);
+    if (persisted) {
+      set({
+        playerName: persisted.playerName,
+        homeX: persisted.homeX,
+        homeY: persisted.homeY,
+        resources: persisted.resources,
+        resourceRates: persisted.resourceRates,
+        buildings: persisted.buildings,
+        fleets: persisted.fleets,
+        research: persisted.research,
       });
     }
   },
   
+  // Save current state to localStorage
+  saveCurrentState: () => {
+    const state = get();
+    if (!state.web3Address) return;
+    
+    saveGameState(state.web3Address, {
+      playerName: state.playerName,
+      homeX: state.homeX,
+      homeY: state.homeY,
+      resources: state.resources,
+      resourceRates: state.resourceRates,
+      buildings: state.buildings,
+      fleets: state.fleets,
+      research: state.research,
+    });
+  },
+  
   setGameState: (gameState) => set({ gameState }),
   
-  setResources: (resources) => set({ resources }),
+  setResources: (resources) => {
+    set({ resources });
+    // Auto-save on resource change
+    const state = get();
+    if (state.web3Address) {
+      saveGameState(state.web3Address, { resources });
+    }
+  },
   
   addResources: (resources) => set((state) => ({
     resources: {
@@ -407,6 +517,16 @@ export const useGameStore = create<GameState>((set, get) => ({
           crystals: 10 * colliderLevel,
         },
       });
+      
+      // Save state after building
+      const state = get();
+      if (state.web3Address) {
+        saveGameState(state.web3Address, {
+          resources: state.resources,
+          resourceRates: state.resourceRates,
+          buildings: state.buildings,
+        });
+      }
     } catch (error) {
       console.error('❌ Build failed:', error);
       throw error;
@@ -523,6 +643,15 @@ export const useGameStore = create<GameState>((set, get) => ({
           };
         }
       });
+      
+      // Save state after building ships
+      const state = get();
+      if (state.web3Address) {
+        saveGameState(state.web3Address, {
+          resources: state.resources,
+          fleets: state.fleets,
+        });
+      }
     } catch (error) {
       console.error('❌ Ship build failed:', error);
       throw error;
@@ -606,6 +735,14 @@ export const useGameStore = create<GameState>((set, get) => ({
             : r
         ),
       }));
+      
+      // Save state after starting research
+      const state = get();
+      if (state.web3Address) {
+        saveGameState(state.web3Address, {
+          research: state.research,
+        });
+      }
     } catch (error) {
       console.error('❌ Research failed:', error);
       throw error;

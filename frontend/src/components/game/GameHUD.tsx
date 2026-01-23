@@ -12,10 +12,12 @@ import { FleetsPanel } from '../panels/FleetsPanel';
 import { ResearchPanel } from '../panels/ResearchPanel';
 import { GalaxyPanel } from '../panels/GalaxyPanel';
 import { DiplomacyPanel } from '../panels/DiplomacyPanel';
+import { LeaderboardPanel } from '../panels/LeaderboardPanel';
 import { MiniMap } from './MiniMap';
 
 export function GameHUD() {
   const { selectedPanel } = useGameStore();
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const renderPanel = () => {
     switch (selectedPanel) {
@@ -87,7 +89,7 @@ export function GameHUD() {
       >
         <div className="flex h-full flex-col gap-4">
           <MiniMap />
-          <QuickActions />
+          <QuickActions onLeaderboard={() => setShowLeaderboard(true)} />
           <EventLog />
         </div>
       </motion.div>
@@ -101,6 +103,13 @@ export function GameHUD() {
       >
         <NotificationBar />
       </motion.div>
+      
+      {/* Leaderboard Modal */}
+      <AnimatePresence>
+        {showLeaderboard && (
+          <LeaderboardPanel onClose={() => setShowLeaderboard(false)} />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -125,12 +134,12 @@ function ActionIcon({ src, fallback, alt }: { src: string; fallback: string; alt
   );
 }
 
-function QuickActions() {
+function QuickActions({ onLeaderboard }: { onLeaderboard?: () => void }) {
   const actions = [
-    { iconSrc: '/images/buildings/plasma-mine.png', icon: '🏗️', label: 'Build', color: 'nebula' },
-    { iconSrc: '/images/ships/battlecruiser.png', icon: '🚀', label: 'Fleet', color: 'plasma' },
-    { iconSrc: '/images/research/physics.png', icon: '🔬', label: 'Research', color: 'energy' },
-    { iconSrc: '/images/resources/crystals.png', icon: '💱', label: 'Trade', color: 'nebula' },
+    { iconSrc: '/images/buildings/plasma-mine.png', icon: '🏗️', label: 'Build', color: 'nebula', onClick: undefined },
+    { iconSrc: '/images/ships/battlecruiser.png', icon: '🚀', label: 'Fleet', color: 'plasma', onClick: undefined },
+    { iconSrc: '/images/research/physics.png', icon: '🔬', label: 'Research', color: 'energy', onClick: undefined },
+    { iconSrc: '/images/resources/crystals.png', icon: '🏆', label: 'Leaderboard', color: 'nebula', onClick: onLeaderboard },
   ];
 
   return (
@@ -148,6 +157,7 @@ function QuickActions() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 + i * 0.1 }}
+            onClick={action.onClick}
           >
             <ActionIcon src={action.iconSrc} fallback={action.icon} alt={action.label} />
             <span className="mt-1 font-body text-xs text-gray-300">{action.label}</span>
