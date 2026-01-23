@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useWallet } from '@/hooks/useWallet';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 
 // Resource icon component with fallback
@@ -152,26 +152,40 @@ function ConnectWalletButton() {
 }
 
 export function ResourceBar() {
-  const { resources, resourceRates } = useGameStore();
+  const { resources, resourceRates, tickResources, saveCurrentState, gameState } = useGameStore();
   const [displayResources, setDisplayResources] = useState(resources);
+  const saveTickRef = useRef(0);
 
   // Sync displayResources when resources change (e.g. after building)
   useEffect(() => {
     setDisplayResources(resources);
   }, [resources]);
 
-  // Smooth resource counter animation
+  // Tick resources every second and save periodically
   useEffect(() => {
+    if (gameState !== 'playing') return;
+    
     const interval = setInterval(() => {
+      // Tick resources in the store (updates actual resources for building/ships)
+      tickResources();
+      
+      // Update display (for smooth animation)
       setDisplayResources((prev) => ({
-        iron: prev.iron + resourceRates.iron / 60,
-        deuterium: prev.deuterium + resourceRates.deuterium / 60,
-        crystals: prev.crystals + resourceRates.crystals / 60,
+        iron: prev.iron + resourceRates.iron / 3600,
+        deuterium: prev.deuterium + resourceRates.deuterium / 3600,
+        crystals: prev.crystals + resourceRates.crystals / 3600,
       }));
-
+      
+      // Save to localStorage every 30 seconds
+      saveTickRef.current++;
+      if (saveTickRef.current >= 30) {
+        saveTickRef.current = 0;
+        saveCurrentState();
+      }
     }, 1000);
+    
     return () => clearInterval(interval);
-  }, [resourceRates]);
+  }, [resourceRates, tickResources, saveCurrentState, gameState]);
 
   return (
     <div className="relative bg-void/90 backdrop-blur-md border-b border-nebula-500/30">

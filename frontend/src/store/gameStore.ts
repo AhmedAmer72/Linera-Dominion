@@ -343,6 +343,9 @@ interface GameState {
   setWalletError: (error: string | null) => void;
   disconnect: () => void;
   
+  // Resource management
+  tickResources: () => void;  // Called every second to increment resources based on rates
+  
   // Game actions
   buildBuilding: (type: string, x: number, y: number) => Promise<void>;
   buildShips: (fleetId: number, ships: Ship[]) => Promise<void>;
@@ -406,6 +409,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       const persisted = loadGameState(state.web3Address);
       if (persisted) {
         console.log('📂 Restored game state from local storage');
+        
+        // Check if there's an offline bonus
+        if (persisted.offlineBonus && (
+          persisted.offlineBonus.resources.iron > 0 || 
+          persisted.offlineBonus.resources.deuterium > 0 || 
+          persisted.offlineBonus.resources.crystals > 0
+        )) {
+          const bonus = persisted.offlineBonus;
+          console.log(`🎁 Offline bonus: +${bonus.resources.iron} Iron, +${bonus.resources.deuterium} Deuterium, +${bonus.resources.crystals} Crystals`);
+        }
+        
         set({
           gameState: 'playing',
           selectedPanel: 'overview',
@@ -419,18 +433,44 @@ export const useGameStore = create<GameState>((set, get) => ({
           research: persisted.research,
         });
         
-        // Also try to fetch latest resources from blockchain
+        // Save updated state with new timestamp (after offline accumulation)
+        saveGameState(state.web3Address, {
+          playerName: persisted.playerName,
+          homeX: persisted.homeX,
+          homeY: persisted.homeY,
+          resources: persisted.resources,
+          resourceRates: persisted.resourceRates,
+          buildings: persisted.buildings,
+          fleets: persisted.fleets,
+          research: persisted.research,
+        });
+        
+        // Try to sync with blockchain, but DON'T overwrite local resources with 0 values
         try {
           const query = `query { iron deuterium crystals }`;
           const result = await lineraAdapter.query<{ iron: number; deuterium: number; crystals: number }>(query);
           if (result) {
-            set({
-              resources: {
-                iron: result.iron || persisted.resources.iron,
-                deuterium: result.deuterium || persisted.resources.deuterium,
-                crystals: result.crystals || persisted.resources.crystals,
-              },
-            });
+            // Only update if blockchain has MORE resources than local (prevents overwriting with 0)
+            const localResources = persisted.resources;
+            const blockchainResources = {
+              iron: result.iron || 0,
+              deuterium: result.deuterium || 0,
+              crystals: result.crystals || 0,
+            };
+            
+            // Use the HIGHER of local vs blockchain values
+            // This handles the case where blockchain returns 0 but local has accumulated resources
+            if (blockchainResources.iron > localResources.iron ||
+                blockchainResources.deuterium > localResources.deuterium ||
+                blockchainResources.crystals > localResources.crystals) {
+              set({
+                resources: {
+                  iron: Math.max(localResources.iron, blockchainResources.iron),
+                  deuterium: Math.max(localResources.deuterium, blockchainResources.deuterium),
+                  crystals: Math.max(localResources.crystals, blockchainResources.crystals),
+                },
+              });
+            }
           }
         } catch (e) {
           console.log('⚠️ Could not fetch latest resources from blockchain, using cached values');
@@ -558,6 +598,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       fleets: state.fleets,
       research: state.research,
     });
+  },
+  
+  // Tick resources based on production rates (called every second)
+  tickResources: () => {
+    const state = get();
+    const rates = state.resourceRates;
+    
+    // Only tick if we have production rates
+    if (rates.iron > 0 || rates.deuterium > 0 || rates.crystals > 0) {
+      // Rates are per hour, so divide by 3600 for per-second increment
+      const ironPerSecond = rates.iron / 3600;
+      const deuteriumPerSecond = rates.deuterium / 3600;
+      const crystalsPerSecond = rates.crystals / 3600;
+      
+      set((state) => ({
+        resources: {
+          iron: state.resources.iron + ironPerSecond,
+          deuterium: state.resources.deuterium + deuteriumPerSecond,
+          crystals: state.resources.crystals + crystalsPerSecond,
+        },
+      }));
+    }
   },
   
   setGameState: (gameState) => set({ gameState }),
