@@ -248,6 +248,32 @@ function HowToPlayModal({ onClose }: { onClose: () => void }) {
 
 // Connect Wallet Popup Modal
 function ConnectWalletModal({ onClose, onConnect }: { onClose: () => void; onConnect: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Check if MetaMask is installed
+  const isMetaMaskInstalled = typeof window !== 'undefined' && !!window.ethereum;
+
+  const handleConnect = async () => {
+    if (!isMetaMaskInstalled) {
+      setError('MetaMask is not installed. Please install it first!');
+      return;
+    }
+    
+    setIsConnecting(true);
+    setError(null);
+    
+    try {
+      await onConnect();
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to connect wallet';
+      setError(message);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   return (
     <motion.div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
@@ -267,10 +293,41 @@ function ConnectWalletModal({ onClose, onConnect }: { onClose: () => void; onCon
           <span className="text-6xl">🦊</span>
         </div>
         <h2 className="font-display text-2xl font-bold text-white mb-2">Connect MetaMask</h2>
-        <p className="text-gray-400 mb-6">
-          Connect your MetaMask wallet to play Linera Dominion. 
-          Your progress will be saved and you can continue from any browser!
-        </p>
+        
+        {!isMetaMaskInstalled ? (
+          <>
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+              <p className="text-red-400 font-medium mb-2">⚠️ MetaMask Not Detected</p>
+              <p className="text-gray-400 text-sm">
+                MetaMask browser extension is required to play Linera Dominion.
+              </p>
+            </div>
+            <a
+              href="https://metamask.io/download/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mb-4 px-6 py-3 rounded-lg bg-gradient-to-r from-orange-600 to-orange-500 text-white font-display font-bold hover:from-orange-500 hover:to-orange-400 transition-all"
+            >
+              🦊 Install MetaMask
+            </a>
+            <p className="text-gray-500 text-xs mb-4">
+              After installing, refresh this page and try again.
+            </p>
+          </>
+        ) : (
+          <p className="text-gray-400 mb-6">
+            Connect your MetaMask wallet to play Linera Dominion. 
+            Your progress will be saved and you can continue from any browser!
+          </p>
+        )}
+        
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+        
         <div className="flex gap-3">
           <motion.button
             className="flex-1 rounded-lg border border-gray-600 bg-void/50 py-3 font-display font-bold text-gray-400 hover:border-gray-500 hover:text-white"
@@ -278,19 +335,35 @@ function ConnectWalletModal({ onClose, onConnect }: { onClose: () => void; onCon
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            CANCEL
+            {isMetaMaskInstalled ? 'CANCEL' : 'CLOSE'}
           </motion.button>
-          <motion.button
-            className="flex-1 rounded-lg bg-gradient-to-r from-nebula-600 to-nebula-500 py-3 font-display font-bold text-white hover:from-nebula-500 hover:to-nebula-400"
-            onClick={() => {
-              onConnect();
-              onClose();
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            CONNECT
-          </motion.button>
+          {isMetaMaskInstalled && (
+            <motion.button
+              className={`flex-1 rounded-lg py-3 font-display font-bold text-white ${
+                isConnecting 
+                  ? 'bg-gray-600 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-nebula-600 to-nebula-500 hover:from-nebula-500 hover:to-nebula-400'
+              }`}
+              onClick={handleConnect}
+              disabled={isConnecting}
+              whileHover={isConnecting ? {} : { scale: 1.02 }}
+              whileTap={isConnecting ? {} : { scale: 0.98 }}
+            >
+              {isConnecting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  >
+                    ⏳
+                  </motion.span>
+                  CONNECTING...
+                </span>
+              ) : (
+                'CONNECT'
+              )}
+            </motion.button>
+          )}
         </div>
       </motion.div>
     </motion.div>
@@ -307,7 +380,19 @@ const menuItems = [
 export function MainMenu({ onStart }: MainMenuProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [modal, setModal] = useState<'settings' | 'about' | 'howtoplay' | 'connectwallet' | null>(null);
-  const { connected, shortChainId, shortWeb3Address, isConnecting, connectWallet, disconnectWallet } = useWallet();
+  const { connected, shortChainId, shortWeb3Address, isConnecting, walletError, connectWallet, disconnectWallet } = useWallet();
+
+  // Check if MetaMask is installed
+  const isMetaMaskInstalled = typeof window !== 'undefined' && !!window.ethereum;
+
+  // Handle connect button click - show modal if MetaMask not installed
+  const handleConnectClick = () => {
+    if (!isMetaMaskInstalled) {
+      setModal('connectwallet');
+    } else {
+      connectWallet();
+    }
+  };
 
   // NOTE: Auto-restore removed - users must manually click Connect
   // This ensures better UX where users control when wallet connects
@@ -382,9 +467,13 @@ export function MainMenu({ onStart }: MainMenuProps) {
             className={`flex items-center gap-3 rounded-xl border px-5 py-3 font-display text-sm font-bold backdrop-blur-sm transition-all ${
               isConnecting 
                 ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400 cursor-wait'
-                : 'border-nebula-500/50 bg-nebula-500/10 text-nebula-300 hover:border-nebula-400 hover:bg-nebula-500/20 hover:text-white'
+                : walletError
+                  ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:border-red-400 hover:bg-red-500/20'
+                  : !isMetaMaskInstalled
+                    ? 'border-orange-500/50 bg-orange-500/10 text-orange-300 hover:border-orange-400 hover:bg-orange-500/20 hover:text-white'
+                    : 'border-nebula-500/50 bg-nebula-500/10 text-nebula-300 hover:border-nebula-400 hover:bg-nebula-500/20 hover:text-white'
             }`}
-            onClick={connectWallet}
+            onClick={handleConnectClick}
             disabled={isConnecting}
             whileHover={!isConnecting ? { scale: 1.02 } : {}}
             whileTap={!isConnecting ? { scale: 0.98 } : {}}
@@ -397,6 +486,11 @@ export function MainMenu({ onStart }: MainMenuProps) {
                   transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                 />
                 <span>Connecting...</span>
+              </>
+            ) : !isMetaMaskInstalled ? (
+              <>
+                <span className="text-lg">⚠️</span>
+                <span>Install MetaMask</span>
               </>
             ) : (
               <>
