@@ -61,11 +61,6 @@ export function GalaxyPanel() {
     const interval = setInterval(fetchGalaxyPlayers, 30000);
     return () => clearInterval(interval);
   }, [fetchGalaxyPlayers]);
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [selectedPlanet, setSelectedPlanet] = useState<any>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Generate stars for the galaxy view
   const stars = useMemo(() => {
