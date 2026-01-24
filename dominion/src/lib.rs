@@ -17,6 +17,7 @@ use thiserror::Error;
 pub use state::{
     DominionState, WalletData, BuildingData, FleetData, 
     TradeOfferData, ResearchData, AllianceData,
+    DiplomacyData, ProposalData, InvasionData,
 };
 
 // ==================== ENUMS ====================
@@ -175,6 +176,58 @@ pub enum Operation {
     
     /// Leave alliance
     LeaveAlliance,
+    
+    // ===== Diplomacy Operations =====
+    /// Propose alliance with another player
+    ProposeAlliance {
+        target_chain: ChainId,
+        alliance_name: String,
+    },
+    
+    /// Accept alliance proposal
+    AcceptAllianceProposal {
+        proposal_id: u64,
+    },
+    
+    /// Reject alliance proposal
+    RejectAllianceProposal {
+        proposal_id: u64,
+    },
+    
+    /// Declare war on another player
+    DeclareWar {
+        target_chain: ChainId,
+    },
+    
+    /// Propose peace treaty
+    ProposePeace {
+        target_chain: ChainId,
+    },
+    
+    /// Accept peace treaty
+    AcceptPeace {
+        proposal_id: u64,
+    },
+    
+    // ===== Invasion Operations =====
+    /// Launch invasion against another player's territory
+    LaunchInvasion {
+        target_chain: ChainId,
+        fleet_id: u64,
+        target_x: i64,
+        target_y: i64,
+    },
+    
+    /// Defend against incoming invasion
+    DefendInvasion {
+        invasion_id: u64,
+        defender_fleet_id: u64,
+    },
+    
+    /// Claim victory resources after successful invasion
+    ClaimInvasionRewards {
+        invasion_id: u64,
+    },
 }
 
 // ==================== MESSAGES ====================
@@ -226,6 +279,66 @@ pub enum Message {
     AllianceInvite {
         alliance_chain: ChainId,
         alliance_name: String,
+    },
+    
+    // ===== Diplomacy Messages =====
+    /// Alliance proposal from another player
+    AllianceProposal {
+        proposal_id: u64,
+        sender: AccountOwner,
+        sender_chain: ChainId,
+        alliance_name: String,
+    },
+    
+    /// Alliance proposal accepted
+    AllianceAccepted {
+        proposal_id: u64,
+        alliance_name: String,
+    },
+    
+    /// Alliance proposal rejected
+    AllianceRejected {
+        proposal_id: u64,
+    },
+    
+    /// War declaration
+    WarDeclared {
+        aggressor: AccountOwner,
+        aggressor_chain: ChainId,
+    },
+    
+    /// Peace proposal
+    PeaceProposal {
+        proposal_id: u64,
+        sender: AccountOwner,
+        sender_chain: ChainId,
+    },
+    
+    /// Peace accepted
+    PeaceAccepted {
+        proposal_id: u64,
+    },
+    
+    // ===== Invasion Messages =====
+    /// Invasion launched
+    InvasionLaunched {
+        invasion_id: u64,
+        attacker: AccountOwner,
+        attacker_chain: ChainId,
+        fleet_strength: u64,
+        target_x: i64,
+        target_y: i64,
+    },
+    
+    /// Invasion result
+    InvasionResult {
+        invasion_id: u64,
+        attacker_won: bool,
+        attacker_losses: u32,
+        defender_losses: u32,
+        loot_iron: u64,
+        loot_deuterium: u64,
+        loot_crystals: u64,
     },
 }
 

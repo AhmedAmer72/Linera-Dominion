@@ -6,8 +6,8 @@
       "homeX": 100,
       "homeY": 100,
       "resources": {
-        "iron": 26.166666666666924,
-        "deuterium": 7.050000000000096,
+        "iron": 74.66666666666522,
+        "deuterium": 21.29999999999997,
         "crystals": 0
       },
       "buildings": [
@@ -30,7 +30,31 @@
       ],
       "fleets": [],
       "research": [],
-      "lastUpdated": 1769216842273
+      "lastUpdated": 1769218627990
+    },
+    "0xeb5c812e8238135600b7535e871b9817e17a969e": {
+      "address": "0xeb5c812e8238135600b7535e871b9817e17a969e",
+      "playerName": "Commander",
+      "homeX": 100,
+      "homeY": 100,
+      "resources": {
+        "iron": 350,
+        "deuterium": 175,
+        "crystals": 40
+      },
+      "buildings": [
+        {
+          "id": 1769218553616,
+          "type": "GasSiphon",
+          "level": 1,
+          "x": 100,
+          "y": 100,
+          "constructionEnd": 1769218613616
+        }
+      ],
+      "fleets": [],
+      "research": [],
+      "lastUpdated": 1769218599274
     }
   }
 }

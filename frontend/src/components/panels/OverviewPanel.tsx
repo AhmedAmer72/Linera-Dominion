@@ -5,6 +5,26 @@ import { useGameStore } from '@/store/gameStore';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
+// Resource icon component for consistent resource display
+function ResourceIcon({ src, fallback, size = 24 }: { src: string; fallback: string; size?: number }) {
+  const [imgError, setImgError] = useState(false);
+  
+  if (imgError) {
+    return <span style={{ fontSize: size }}>{fallback}</span>;
+  }
+  
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      className="object-contain"
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
 // Icon component with fallback
 function GameIcon({ src, fallback, size = 64 }: { src: string; fallback: string; size?: number }) {
   const [imgError, setImgError] = useState(false);
@@ -79,17 +99,17 @@ export function OverviewPanel() {
         </h3>
         <div className="flex gap-6">
           <div className="flex items-center gap-2">
-            <span className="text-xl">⛏️</span>
+            <ResourceIcon src="/images/resources/iron.png" fallback="⛏️" size={28} />
             <span className="font-display text-lg text-white">+{resourceRates.iron}</span>
             <span className="text-gray-400">Iron</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xl">💧</span>
+            <ResourceIcon src="/images/resources/deuterium.png" fallback="💧" size={28} />
             <span className="font-display text-lg text-white">+{resourceRates.deuterium}</span>
             <span className="text-gray-400">Deuterium</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xl">💎</span>
+            <ResourceIcon src="/images/resources/crystals.png" fallback="💎" size={28} />
             <span className="font-display text-lg text-white">+{resourceRates.crystals}</span>
             <span className="text-gray-400">Crystals</span>
           </div>

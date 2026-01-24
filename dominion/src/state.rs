@@ -69,6 +69,42 @@ pub struct AllianceData {
     pub role: u8, // 0=member, 1=officer, 2=leader
 }
 
+/// Diplomacy status with another player
+#[derive(Debug, Clone, Default, Serialize, Deserialize, SimpleObject)]
+pub struct DiplomacyData {
+    pub status: u8,             // 0=neutral, 1=allied, 2=at_war, 3=peace_pending
+    pub alliance_name: Option<String>,
+    pub started_micros: u64,
+}
+
+/// Alliance/Diplomacy proposal
+#[derive(Debug, Clone, Default, Serialize, Deserialize, SimpleObject)]
+pub struct ProposalData {
+    pub proposal_type: u8,      // 0=alliance, 1=peace
+    pub sender_chain: String,   // ChainId as string
+    pub alliance_name: Option<String>,
+    pub created_micros: u64,
+    pub expires_micros: u64,
+}
+
+/// Invasion record
+#[derive(Debug, Clone, Default, Serialize, Deserialize, SimpleObject)]
+pub struct InvasionData {
+    pub attacker_chain: String, // ChainId as string
+    pub defender_chain: String,
+    pub attacker_fleet_id: u64,
+    pub target_x: i64,
+    pub target_y: i64,
+    pub status: u8,             // 0=pending, 1=in_progress, 2=victory, 3=defeat
+    pub attacker_strength: u64,
+    pub defender_strength: u64,
+    pub loot_iron: u64,
+    pub loot_deuterium: u64,
+    pub loot_crystals: u64,
+    pub started_micros: u64,
+    pub resolved_micros: Option<u64>,
+}
+
 // ==================== STATE VIEW ====================
 
 /// Root state for a Dominion (user chain)
@@ -103,6 +139,17 @@ pub struct DominionState {
     
     /// Alliance membership
     alliance: RegisterView<Option<AllianceData>>,
+    
+    /// Diplomacy status: key = other player's chain_id as string
+    diplomacy: MapView<String, DiplomacyData>,
+    
+    /// Pending proposals: key = proposal_id
+    proposals: MapView<u64, ProposalData>,
+    proposal_count: RegisterView<u64>,
+    
+    /// Invasion records: key = invasion_id
+    invasions: MapView<u64, InvasionData>,
+    invasion_count: RegisterView<u64>,
 }
 
 // ==================== STATE IMPLEMENTATION ====================

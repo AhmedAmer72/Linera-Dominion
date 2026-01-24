@@ -5,6 +5,26 @@ import { useGameStore } from '@/store/gameStore';
 import { useState } from 'react';
 import Image from 'next/image';
 
+// Resource icon component for cost display
+function ResourceIcon({ src, fallback, size = 16 }: { src: string; fallback: string; size?: number }) {
+  const [imgError, setImgError] = useState(false);
+  
+  if (imgError) {
+    return <span style={{ fontSize: size }}>{fallback}</span>;
+  }
+  
+  return (
+    <Image
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      className="object-contain"
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
 // Icon component with fallback
 function BuildingIcon({ src, fallback, name }: { src: string; fallback: string; name: string }) {
   const [imgError, setImgError] = useState(false);
@@ -244,17 +264,20 @@ export function BuildingsPanel() {
                     <div className="mb-3 flex gap-3">
                       <CostItem 
                         icon="⛏️" 
+                        iconSrc="/images/resources/iron.png"
                         value={building.cost.iron * (level + 1)} 
                         available={resources.iron}
                       />
                       <CostItem 
                         icon="💧" 
+                        iconSrc="/images/resources/deuterium.png"
                         value={building.cost.deuterium * (level + 1)} 
                         available={resources.deuterium}
                       />
                       {building.cost.crystals > 0 && (
                         <CostItem 
                           icon="💎" 
+                          iconSrc="/images/resources/crystals.png"
                           value={building.cost.crystals * (level + 1)} 
                           available={resources.crystals}
                         />
@@ -313,14 +336,26 @@ export function BuildingsPanel() {
   );
 }
 
-function CostItem({ icon, value, available }: { icon: string; value: number; available: number }) {
+function CostItem({ icon, iconSrc, value, available }: { icon: string; iconSrc?: string; value: number; available: number }) {
   const canAfford = available >= value;
+  const [imgError, setImgError] = useState(false);
   
   return (
     <div className={`flex items-center gap-1 rounded bg-void/50 px-2 py-1 ${
       canAfford ? 'text-gray-300' : 'text-red-400'
     }`}>
-      <span className="text-sm">{icon}</span>
+      {iconSrc && !imgError ? (
+        <Image
+          src={iconSrc}
+          alt=""
+          width={18}
+          height={18}
+          className="object-contain"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <span className="text-sm">{icon}</span>
+      )}
       <span className="font-display text-xs font-bold">{value.toLocaleString()}</span>
     </div>
   );

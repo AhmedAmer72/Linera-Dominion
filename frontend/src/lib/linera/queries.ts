@@ -170,6 +170,91 @@ export const LEAVE_ALLIANCE = `
   }
 `;
 
+// ==================== DIPLOMACY MUTATIONS ====================
+
+/**
+ * Propose alliance with another player
+ */
+export const PROPOSE_ALLIANCE = `
+  mutation ProposeAlliance($targetChain: String!, $allianceName: String!) {
+    proposeAlliance(targetChain: $targetChain, allianceName: $allianceName)
+  }
+`;
+
+/**
+ * Accept alliance proposal
+ */
+export const ACCEPT_ALLIANCE_PROPOSAL = `
+  mutation AcceptAllianceProposal($proposalId: Int!) {
+    acceptAllianceProposal(proposalId: $proposalId)
+  }
+`;
+
+/**
+ * Reject alliance proposal
+ */
+export const REJECT_ALLIANCE_PROPOSAL = `
+  mutation RejectAllianceProposal($proposalId: Int!) {
+    rejectAllianceProposal(proposalId: $proposalId)
+  }
+`;
+
+/**
+ * Declare war on another player
+ */
+export const DECLARE_WAR = `
+  mutation DeclareWar($targetChain: String!) {
+    declareWar(targetChain: $targetChain)
+  }
+`;
+
+/**
+ * Propose peace treaty
+ */
+export const PROPOSE_PEACE = `
+  mutation ProposePeace($targetChain: String!) {
+    proposePeace(targetChain: $targetChain)
+  }
+`;
+
+/**
+ * Accept peace treaty
+ */
+export const ACCEPT_PEACE = `
+  mutation AcceptPeace($proposalId: Int!) {
+    acceptPeace(proposalId: $proposalId)
+  }
+`;
+
+// ==================== INVASION MUTATIONS ====================
+
+/**
+ * Launch invasion against another player
+ */
+export const LAUNCH_INVASION = `
+  mutation LaunchInvasion($targetChain: String!, $fleetId: Int!, $targetX: Int!, $targetY: Int!) {
+    launchInvasion(targetChain: $targetChain, fleetId: $fleetId, targetX: $targetX, targetY: $targetY)
+  }
+`;
+
+/**
+ * Defend against incoming invasion
+ */
+export const DEFEND_INVASION = `
+  mutation DefendInvasion($invasionId: Int!, $defenderFleetId: Int!) {
+    defendInvasion(invasionId: $invasionId, defenderFleetId: $defenderFleetId)
+  }
+`;
+
+/**
+ * Claim rewards after successful invasion
+ */
+export const CLAIM_INVASION_REWARDS = `
+  mutation ClaimInvasionRewards($invasionId: Int!) {
+    claimInvasionRewards(invasionId: $invasionId)
+  }
+`;
+
 // ==================== TYPE DEFINITIONS ====================
 
 /**

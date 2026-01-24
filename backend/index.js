@@ -304,8 +304,8 @@ app.get('/api/galaxy/player/:address', (req, res) => {
   const attackerShips = attacker ? (attacker.fleets || []).reduce((sum, f) => 
     sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0) : 0;
   
-  // Calculate minimum ships needed to invade (50% of defender's ships + 10)
-  const minShipsRequired = Math.floor(defenderShips * 0.5) + 10;
+  // Calculate minimum ships needed to invade (25% of defender's ships + 2) - lowered for testing
+  const minShipsRequired = Math.floor(defenderShips * 0.25) + 2;
   
   // Check if attacker meets requirements
   const canInvade = attacker && attackerShips >= minShipsRequired;
@@ -361,7 +361,8 @@ app.post('/api/galaxy/invade', (req, res) => {
   const defenderShips = (defender.fleets || []).reduce((sum, f) => 
     sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0);
   
-  const minShipsRequired = Math.floor(defenderShips * 0.5) + 10;
+  // Lowered requirements for testing: 25% of defender + 2 minimum
+  const minShipsRequired = Math.floor(defenderShips * 0.25) + 2;
   
   if (attackerShips < minShipsRequired) {
     return res.status(400).json({ 
