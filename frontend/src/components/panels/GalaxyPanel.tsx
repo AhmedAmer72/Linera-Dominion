@@ -3,7 +3,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useGameStore } from '@/store/gameStore';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { getGalaxyPlayers, getInvasionInfo, executeInvasion, GalaxyPlayer, InvasionInfo, InvasionResult } from '@/lib/leaderboardApi';
 
 // Fleet icon with fallback for galaxy view
 function GalaxyFleetIcon({ size, fallback = '🚀' }: { size: number; fallback?: string }) {
@@ -26,7 +27,40 @@ function GalaxyFleetIcon({ size, fallback = '🚀' }: { size: number; fallback?:
 }
 
 export function GalaxyPanel() {
-  const { knownPlanets, fleets, homeX, homeY } = useGameStore();
+  const { knownPlanets, fleets, homeX, homeY, web3Address, playerName } = useGameStore();
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [selectedPlanet, setSelectedPlanet] = useState<any>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<GalaxyPlayer | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Multiplayer state
+  const [galaxyPlayers, setGalaxyPlayers] = useState<GalaxyPlayer[]>([]);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
+  
+  // Fetch galaxy players on mount and periodically
+  const fetchGalaxyPlayers = useCallback(async () => {
+    if (!web3Address) return;
+    
+    setLoadingPlayers(true);
+    try {
+      const result = await getGalaxyPlayers(web3Address);
+      if (result) {
+        setGalaxyPlayers(result.players);
+      }
+    } catch (e) {
+      console.warn('Could not fetch galaxy players');
+    }
+    setLoadingPlayers(false);
+  }, [web3Address]);
+  
+  useEffect(() => {
+    fetchGalaxyPlayers();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchGalaxyPlayers, 30000);
+    return () => clearInterval(interval);
+  }, [fetchGalaxyPlayers]);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [selectedPlanet, setSelectedPlanet] = useState<any>(null);
@@ -335,6 +369,105 @@ export function GalaxyPanel() {
             </motion.div>
           );
         })}
+        
+        {/* ===== PLAYER PLANETS (Other Players in the Galaxy) ===== */}
+        {galaxyPlayers.map((player, i) => {
+          const playerX = 50 + ((player.homeX - homeX) * 5 + offset.x) * zoom;
+          const playerY = 50 + ((player.homeY - homeY) * 5 + offset.y) * zoom;
+          
+          // Determine player threat level by power
+          const threatLevel = player.powerLevel < 5 ? 'weak' : player.powerLevel < 15 ? 'medium' : 'strong';
+          const threatColors = {
+            weak: '#4ade80', // green
+            medium: '#fbbf24', // yellow
+            strong: '#f87171', // red
+          };
+          
+          return (
+            <motion.div
+              key={`player-${player.address}`}
+              className="absolute cursor-pointer"
+              style={{
+                left: `${playerX}%`,
+                top: `${playerY}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: i * 0.05 + 0.5 }}
+              onClick={() => setSelectedPlayer(player)}
+              whileHover={{ scale: 1.3 }}
+            >
+              {/* Player planet glow */}
+              <motion.div
+                className="absolute inset-0 rounded-full blur-md"
+                style={{
+                  background: threatColors[threatLevel],
+                  width: 35 * zoom,
+                  height: 35 * zoom,
+                  marginLeft: -17.5 * zoom,
+                  marginTop: -17.5 * zoom,
+                  opacity: 0.4,
+                }}
+                animate={{
+                  scale: [1, 1.4, 1],
+                  opacity: [0.4, 0.6, 0.4],
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+              
+              {/* Player planet body - hexagonal shape for players */}
+              <motion.div
+                className="relative flex items-center justify-center"
+                style={{
+                  width: 24 * zoom,
+                  height: 24 * zoom,
+                  background: `linear-gradient(135deg, ${threatColors[threatLevel]} 0%, #1a1a2e 100%)`,
+                  boxShadow: `0 0 ${12 * zoom}px ${threatColors[threatLevel]}`,
+                  clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+              >
+                {/* Player icon */}
+                <span style={{ fontSize: 10 * zoom }}>👤</span>
+              </motion.div>
+              
+              {/* Online indicator */}
+              {Date.now() - player.lastUpdated < 5 * 60 * 1000 && (
+                <motion.div
+                  className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-400"
+                  style={{ width: 8 * zoom, height: 8 * zoom }}
+                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
+              )}
+              
+              {/* Player label */}
+              <div
+                className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-center"
+                style={{ top: 28 * zoom }}
+              >
+                <p className="font-display text-xs font-bold" style={{ fontSize: 9 * zoom, color: threatColors[threatLevel] }}>
+                  {player.playerName.slice(0, 12)}
+                </p>
+                <span 
+                  className="inline-block mt-0.5 px-1 py-0.5 rounded bg-void/80 text-gray-400"
+                  style={{ fontSize: 7 * zoom }}
+                >
+                  ⚡{player.powerLevel} | 🚀{player.totalShips}
+                </span>
+              </div>
+            </motion.div>
+          );
+        })}
+        
+        {/* Player count indicator */}
+        {galaxyPlayers.length > 0 && (
+          <div className="absolute top-4 right-4 rounded bg-void/80 px-3 py-2 font-display text-xs text-energy-400 border border-energy-500/30">
+            👥 {galaxyPlayers.length} Players Online
+          </div>
+        )}
 
         {/* Home indicator */}
         <motion.div
@@ -374,8 +507,16 @@ export function GalaxyPanel() {
 
       {/* Planet Details Panel */}
       <AnimatePresence>
-        {selectedPlanet && (
+        {selectedPlanet && !selectedPlayer && (
           <PlanetDetailsPanel planet={selectedPlanet} onClose={() => setSelectedPlanet(null)} />
+        )}
+        {selectedPlayer && (
+          <PlayerDetailsPanel 
+            player={selectedPlayer} 
+            onClose={() => setSelectedPlayer(null)}
+            myAddress={web3Address || ''}
+            onInvasionComplete={fetchGalaxyPlayers}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -657,6 +798,267 @@ function PlanetDetailsPanel({ planet, onClose }: { planet: any; onClose: () => v
           >
             Manage Colony
           </motion.button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ===== PLAYER DETAILS PANEL (For attacking other players) =====
+interface PlayerDetailsPanelProps {
+  player: GalaxyPlayer;
+  onClose: () => void;
+  myAddress: string;
+  onInvasionComplete: () => void;
+}
+
+function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: PlayerDetailsPanelProps) {
+  const { fleets, resources } = useGameStore();
+  const [invasionInfo, setInvasionInfo] = useState<InvasionInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [invading, setInvading] = useState(false);
+  const [battleResult, setBattleResult] = useState<InvasionResult | null>(null);
+  
+  // Calculate my total ships
+  const myTotalShips = fleets.reduce((sum, fleet) => 
+    sum + fleet.ships.reduce((s, ship) => s + ship.quantity, 0), 0);
+  
+  // Fetch invasion info on mount
+  useEffect(() => {
+    const fetchInfo = async () => {
+      setLoading(true);
+      const info = await getInvasionInfo(player.address, myAddress);
+      setInvasionInfo(info);
+      setLoading(false);
+    };
+    fetchInfo();
+  }, [player.address, myAddress]);
+  
+  // Handle invasion
+  const handleInvade = async () => {
+    if (!invasionInfo?.invasion.canInvade) return;
+    
+    setInvading(true);
+    try {
+      const result = await executeInvasion(myAddress, player.address);
+      if (result) {
+        setBattleResult(result);
+        onInvasionComplete(); // Refresh galaxy players
+      }
+    } catch (e) {
+      console.error('Invasion failed:', e);
+    }
+    setInvading(false);
+  };
+  
+  // Threat level colors
+  const threatLevel = player.powerLevel < 5 ? 'weak' : player.powerLevel < 15 ? 'medium' : 'strong';
+  const threatColors = {
+    weak: { bg: 'bg-green-500/20', border: 'border-green-500/50', text: 'text-green-400', label: 'Easy Target' },
+    medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-500/50', text: 'text-yellow-400', label: 'Moderate' },
+    strong: { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', label: 'Dangerous' },
+  };
+  const threatStyle = threatColors[threatLevel];
+
+  return (
+    <motion.div
+      className="absolute bottom-20 left-6 right-6 z-10 rounded-xl border border-energy-500/50 bg-void/95 p-4 backdrop-blur-md max-h-[60vh] overflow-y-auto custom-scrollbar"
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <motion.div
+            className="flex h-16 w-16 items-center justify-center rounded-lg"
+            style={{
+              background: `linear-gradient(135deg, ${threatLevel === 'weak' ? '#4ade80' : threatLevel === 'medium' ? '#fbbf24' : '#f87171'} 0%, #1a1a2e 100%)`,
+              boxShadow: `0 0 20px ${threatLevel === 'weak' ? '#4ade80' : threatLevel === 'medium' ? '#fbbf24' : '#f87171'}`,
+            }}
+          >
+            <span className="text-2xl">👤</span>
+          </motion.div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-xl font-bold text-white">{player.playerName}</h3>
+              <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${threatStyle.bg} ${threatStyle.border} ${threatStyle.text} border`}>
+                {threatStyle.label}
+              </span>
+            </div>
+            <p className="font-body text-sm text-gray-400">
+              Power Level: ⚡{player.powerLevel} | Score: {player.score.toLocaleString()}
+            </p>
+            <p className="font-body text-xs text-gray-500">
+              Coordinates: ({player.homeX}, {player.homeY}) • {player.address.slice(0, 8)}...
+            </p>
+          </div>
+        </div>
+        <motion.button
+          className="text-gray-400 hover:text-white cursor-pointer"
+          onClick={onClose}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          ✕
+        </motion.button>
+      </div>
+
+      {/* Battle Result */}
+      {battleResult && (
+        <motion.div
+          className={`mt-4 p-4 rounded-lg border ${battleResult.victory ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+        >
+          <h4 className={`font-display text-lg font-bold ${battleResult.victory ? 'text-green-400' : 'text-red-400'}`}>
+            {battleResult.victory ? '🎉 Victory!' : '💀 Defeat!'}
+          </h4>
+          <p className="text-sm text-gray-300 mt-1">{battleResult.message}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <div className="text-gray-400">Your losses: <span className="text-red-400">{battleResult.battle.attackerShipsLost} ships</span></div>
+            <div className="text-gray-400">Enemy losses: <span className="text-green-400">{battleResult.battle.defenderShipsLost} ships</span></div>
+          </div>
+          {battleResult.loot && (
+            <div className="mt-2 flex gap-3 text-xs">
+              <span className="text-iron">+{battleResult.loot.iron} Iron</span>
+              <span className="text-deuterium">+{battleResult.loot.deuterium} Deuterium</span>
+              <span className="text-crystals">+{battleResult.loot.crystals} Crystals</span>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Player Stats */}
+      {!battleResult && (
+        <>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="rounded-lg border border-gray-700 bg-void/50 p-3 text-center">
+              <p className="font-body text-xs text-gray-400">Total Ships</p>
+              <p className="font-display text-lg font-bold text-energy-400">
+                🚀 {player.totalShips}
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-700 bg-void/50 p-3 text-center">
+              <p className="font-body text-xs text-gray-400">Buildings</p>
+              <p className="font-display text-lg font-bold text-nebula-400">
+                🏗️ {player.totalBuildingLevels}
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-700 bg-void/50 p-3 text-center">
+              <p className="font-body text-xs text-gray-400">Fleets</p>
+              <p className="font-display text-lg font-bold text-plasma-400">
+                ⚔️ {player.fleetCount}
+              </p>
+            </div>
+          </div>
+
+          {/* Invasion Requirements */}
+          {loading ? (
+            <div className="mt-4 text-center text-gray-400">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="inline-block"
+              >
+                ⏳
+              </motion.div>
+              <span className="ml-2">Analyzing defenses...</span>
+            </div>
+          ) : invasionInfo ? (
+            <div className="mt-4">
+              <h4 className="font-display text-sm font-bold text-nebula-400 mb-2 flex items-center gap-2">
+                <span>⚔️</span> Invasion Analysis
+              </h4>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Enemy Ships:</span>
+                  <span className="text-red-400 font-mono">{invasionInfo.defender.totalShips}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Your Ships:</span>
+                  <span className="text-energy-400 font-mono">{myTotalShips}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Ships Required:</span>
+                  <span className={`font-mono ${myTotalShips >= invasionInfo.invasion.minShipsRequired ? 'text-green-400' : 'text-red-400'}`}>
+                    {invasionInfo.invasion.minShipsRequired}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Est. Loot:</span>
+                  <span className="text-crystals font-mono">
+                    ~{Math.round(invasionInfo.invasion.estimatedLootRatio * 100)}% of resources
+                  </span>
+                </div>
+              </div>
+              
+              {/* Status */}
+              <div className={`mt-3 p-2 rounded-lg border ${invasionInfo.invasion.canInvade ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                {invasionInfo.invasion.canInvade ? (
+                  <p className="text-green-400 text-sm font-bold flex items-center gap-2">
+                    <span>✅</span> Ready to invade! You have enough ships.
+                  </p>
+                ) : (
+                  <p className="text-red-400 text-sm font-bold flex items-center gap-2">
+                    <span>❌</span> Need {invasionInfo.invasion.minShipsRequired - myTotalShips} more ships
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 text-center text-gray-400">
+              Could not analyze player defenses
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Action Buttons */}
+      <div className="mt-4 flex gap-3">
+        {battleResult ? (
+          <motion.button
+            className="flex-1 py-2 rounded-lg font-display font-bold bg-nebula-500 text-white hover:bg-nebula-400"
+            onClick={onClose}
+            whileHover={{ scale: 1.02 }}
+          >
+            Close
+          </motion.button>
+        ) : (
+          <>
+            <motion.button
+              className={`flex-1 py-2 rounded-lg font-display font-bold transition-all ${
+                invasionInfo?.invasion.canInvade && !invading
+                  ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-500 hover:to-orange-500'
+                  : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+              }`}
+              whileHover={invasionInfo?.invasion.canInvade ? { scale: 1.02 } : {}}
+              onClick={handleInvade}
+              disabled={!invasionInfo?.invasion.canInvade || invading}
+            >
+              {invading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                  >
+                    ⚔️
+                  </motion.span>
+                  Attacking...
+                </span>
+              ) : (
+                '⚔️ Launch Invasion'
+              )}
+            </motion.button>
+            <motion.button
+              className="flex-1 rounded-lg border border-nebula-500 py-2 font-display font-bold text-nebula-400 hover:bg-nebula-500/10"
+              onClick={onClose}
+              whileHover={{ scale: 1.02 }}
+            >
+              Cancel
+            </motion.button>
+          </>
         )}
       </div>
     </motion.div>

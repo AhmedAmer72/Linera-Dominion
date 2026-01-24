@@ -509,6 +509,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       
       console.log('✅ Game state fetched:', result);
       
+      // Ensure minimum starter resources (never start with 0)
+      const MIN_IRON = 500;
+      const MIN_DEUTERIUM = 200;
+      const MIN_CRYSTALS = 50;
+      
       const newState = {
         gameState: 'playing' as const,
         selectedPanel: 'overview' as const,
@@ -516,9 +521,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         homeX: result.homeX || 100,
         homeY: result.homeY || 100,
         resources: {
-          iron: result.iron || 500,
-          deuterium: result.deuterium || 200,
-          crystals: result.crystals || 50,
+          iron: Math.max(result.iron || 0, MIN_IRON),
+          deuterium: Math.max(result.deuterium || 0, MIN_DEUTERIUM),
+          crystals: Math.max(result.crystals || 0, MIN_CRYSTALS),
         },
       };
       

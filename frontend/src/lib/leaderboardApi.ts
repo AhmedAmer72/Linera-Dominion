@@ -162,3 +162,140 @@ export async function checkApiHealth(): Promise<boolean> {
     return false;
   }
 }
+
+// ==================== GALAXY/MULTIPLAYER API ====================
+
+export interface GalaxyPlayer {
+  address: string;
+  playerName: string;
+  homeX: number;
+  homeY: number;
+  score: number;
+  powerLevel: number;
+  totalShips: number;
+  totalBuildingLevels: number;
+  fleetCount: number;
+  lastUpdated: number;
+}
+
+export interface GalaxyPlayersResponse {
+  players: GalaxyPlayer[];
+  totalPlayers: number;
+  timestamp: string;
+}
+
+export interface InvasionInfo {
+  defender: {
+    address: string;
+    playerName: string;
+    homeX: number;
+    homeY: number;
+    score: number;
+    totalShips: number;
+    totalBuildingLevels: number;
+    resources: {
+      iron: number;
+      deuterium: number;
+      crystals: number;
+    };
+    lastUpdated: number;
+  };
+  invasion: {
+    minShipsRequired: number;
+    attackerShips: number;
+    canInvade: boolean;
+    estimatedLootRatio: number;
+  };
+}
+
+export interface InvasionResult {
+  success: boolean;
+  victory: boolean;
+  battle: {
+    attackerShipsLost: number;
+    defenderShipsLost: number;
+    powerRatio: string;
+  };
+  loot: {
+    iron: number;
+    deuterium: number;
+    crystals: number;
+  } | null;
+  message: string;
+}
+
+/**
+ * Get all players for galaxy map
+ */
+export async function getGalaxyPlayers(excludeAddress?: string): Promise<GalaxyPlayersResponse | null> {
+  try {
+    const url = excludeAddress 
+      ? `${API_URL}/api/galaxy/players?excludeAddress=${excludeAddress}`
+      : `${API_URL}/api/galaxy/players`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch galaxy players: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.warn('⚠️ Could not fetch galaxy players:', error);
+    return null;
+  }
+}
+
+/**
+ * Get invasion info for a specific player
+ */
+export async function getInvasionInfo(defenderAddress: string, attackerAddress: string): Promise<InvasionInfo | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/galaxy/player/${defenderAddress}?attackerAddress=${attackerAddress}`
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Failed to fetch invasion info: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.warn('⚠️ Could not fetch invasion info:', error);
+    return null;
+  }
+}
+
+/**
+ * Execute an invasion
+ */
+export async function executeInvasion(
+  attackerAddress: string, 
+  defenderAddress: string, 
+  fleetId?: number
+): Promise<InvasionResult | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/galaxy/invade`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        attackerAddress,
+        defenderAddress,
+        fleetId,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Invasion failed');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('❌ Invasion failed:', error);
+    return null;
+  }
+}

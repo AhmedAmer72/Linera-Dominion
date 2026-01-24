@@ -230,6 +230,227 @@ app.delete('/api/player/:address', (req, res) => {
   res.json({ success: true });
 });
 
+// ==================== GALAXY/MULTIPLAYER ROUTES ====================
+
+/**
+ * Get all players for the galaxy map
+ * Returns position, power level, and basic info for each player
+ */
+app.get('/api/galaxy/players', (req, res) => {
+  const { excludeAddress } = req.query;
+  const normalizedExclude = excludeAddress?.toLowerCase();
+  
+  const data = loadData();
+  
+  // Convert players to galaxy map format
+  const galaxyPlayers = Object.values(data.players)
+    .filter(player => player.address !== normalizedExclude) // Exclude current player
+    .map(player => {
+      const score = calculateScore(player);
+      const totalShips = (player.fleets || []).reduce((sum, f) => 
+        sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0);
+      const totalBuildingLevels = (player.buildings || []).reduce((sum, b) => sum + (b.level || 1), 0);
+      
+      // Calculate power level (determines difficulty to invade)
+      const powerLevel = Math.floor(score / 100);
+      
+      return {
+        address: player.address,
+        playerName: player.playerName || 'Unknown Commander',
+        homeX: player.homeX || Math.floor(Math.random() * 20) - 10,
+        homeY: player.homeY || Math.floor(Math.random() * 20) - 10,
+        score,
+        powerLevel,
+        totalShips,
+        totalBuildingLevels,
+        fleetCount: player.fleets?.length || 0,
+        lastUpdated: player.lastUpdated,
+      };
+    })
+    // Only include players who have been active in last 7 days
+    .filter(p => p.lastUpdated && Date.now() - p.lastUpdated < 7 * 24 * 60 * 60 * 1000);
+  
+  res.json({
+    players: galaxyPlayers,
+    totalPlayers: galaxyPlayers.length,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * Get a specific player's invasion info
+ * Used when clicking on a player in the galaxy to see if invasion is possible
+ */
+app.get('/api/galaxy/player/:address', (req, res) => {
+  const { address } = req.params;
+  const { attackerAddress } = req.query;
+  const normalizedAddress = address.toLowerCase();
+  const normalizedAttacker = attackerAddress?.toLowerCase();
+  
+  const data = loadData();
+  const defender = data.players[normalizedAddress];
+  const attacker = normalizedAttacker ? data.players[normalizedAttacker] : null;
+  
+  if (!defender) {
+    return res.status(404).json({ error: 'Player not found' });
+  }
+  
+  const defenderScore = calculateScore(defender);
+  const attackerScore = attacker ? calculateScore(attacker) : 0;
+  
+  // Calculate total ships for both players
+  const defenderShips = (defender.fleets || []).reduce((sum, f) => 
+    sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0);
+  const attackerShips = attacker ? (attacker.fleets || []).reduce((sum, f) => 
+    sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0) : 0;
+  
+  // Calculate minimum ships needed to invade (50% of defender's ships + 10)
+  const minShipsRequired = Math.floor(defenderShips * 0.5) + 10;
+  
+  // Check if attacker meets requirements
+  const canInvade = attacker && attackerShips >= minShipsRequired;
+  
+  res.json({
+    defender: {
+      address: defender.address,
+      playerName: defender.playerName || 'Unknown Commander',
+      homeX: defender.homeX,
+      homeY: defender.homeY,
+      score: defenderScore,
+      totalShips: defenderShips,
+      totalBuildingLevels: (defender.buildings || []).reduce((sum, b) => sum + (b.level || 1), 0),
+      resources: defender.resources,
+      lastUpdated: defender.lastUpdated,
+    },
+    invasion: {
+      minShipsRequired,
+      attackerShips,
+      canInvade,
+      estimatedLootRatio: Math.min(0.5, attackerShips / (defenderShips || 1) * 0.25), // Max 50% loot
+    },
+  });
+});
+
+/**
+ * Execute an invasion attempt
+ */
+app.post('/api/galaxy/invade', (req, res) => {
+  const { attackerAddress, defenderAddress, fleetId } = req.body;
+  
+  if (!attackerAddress || !defenderAddress) {
+    return res.status(400).json({ error: 'Missing attacker or defender address' });
+  }
+  
+  const normalizedAttacker = attackerAddress.toLowerCase();
+  const normalizedDefender = defenderAddress.toLowerCase();
+  
+  const data = loadData();
+  const attacker = data.players[normalizedAttacker];
+  const defender = data.players[normalizedDefender];
+  
+  if (!attacker) {
+    return res.status(404).json({ error: 'Attacker not found' });
+  }
+  if (!defender) {
+    return res.status(404).json({ error: 'Defender not found' });
+  }
+  
+  // Calculate ships
+  const attackerShips = (attacker.fleets || []).reduce((sum, f) => 
+    sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0);
+  const defenderShips = (defender.fleets || []).reduce((sum, f) => 
+    sum + (f.ships || []).reduce((s, ship) => s + (ship.quantity || 0), 0), 0);
+  
+  const minShipsRequired = Math.floor(defenderShips * 0.5) + 10;
+  
+  if (attackerShips < minShipsRequired) {
+    return res.status(400).json({ 
+      error: 'Not enough ships', 
+      required: minShipsRequired, 
+      have: attackerShips 
+    });
+  }
+  
+  // Simulate battle
+  // Attacker needs to overcome defender's ships
+  // Victory ratio determines loot and losses
+  const powerRatio = attackerShips / (defenderShips || 1);
+  const victoryChance = Math.min(0.9, powerRatio * 0.4);
+  const victory = Math.random() < victoryChance;
+  
+  // Calculate losses (both sides lose ships)
+  const attackerLossRatio = victory ? 0.1 + Math.random() * 0.2 : 0.3 + Math.random() * 0.4;
+  const defenderLossRatio = victory ? 0.3 + Math.random() * 0.3 : 0.1 + Math.random() * 0.2;
+  
+  // Apply losses to attacker's fleets
+  let attackerShipsLost = 0;
+  if (attacker.fleets) {
+    for (const fleet of attacker.fleets) {
+      if (fleet.ships) {
+        for (const ship of fleet.ships) {
+          const losses = Math.floor(ship.quantity * attackerLossRatio);
+          attackerShipsLost += losses;
+          ship.quantity = Math.max(0, ship.quantity - losses);
+        }
+      }
+    }
+  }
+  
+  // Apply losses to defender's fleets
+  let defenderShipsLost = 0;
+  if (defender.fleets) {
+    for (const fleet of defender.fleets) {
+      if (fleet.ships) {
+        for (const ship of fleet.ships) {
+          const losses = Math.floor(ship.quantity * defenderLossRatio);
+          defenderShipsLost += losses;
+          ship.quantity = Math.max(0, ship.quantity - losses);
+        }
+      }
+    }
+  }
+  
+  // Calculate loot if victory
+  let loot = { iron: 0, deuterium: 0, crystals: 0 };
+  if (victory && defender.resources) {
+    const lootRatio = Math.min(0.5, powerRatio * 0.25);
+    loot = {
+      iron: Math.floor((defender.resources.iron || 0) * lootRatio),
+      deuterium: Math.floor((defender.resources.deuterium || 0) * lootRatio),
+      crystals: Math.floor((defender.resources.crystals || 0) * lootRatio),
+    };
+    
+    // Transfer resources
+    defender.resources.iron = Math.max(0, defender.resources.iron - loot.iron);
+    defender.resources.deuterium = Math.max(0, defender.resources.deuterium - loot.deuterium);
+    defender.resources.crystals = Math.max(0, defender.resources.crystals - loot.crystals);
+    
+    attacker.resources = attacker.resources || { iron: 0, deuterium: 0, crystals: 0 };
+    attacker.resources.iron = (attacker.resources.iron || 0) + loot.iron;
+    attacker.resources.deuterium = (attacker.resources.deuterium || 0) + loot.deuterium;
+    attacker.resources.crystals = (attacker.resources.crystals || 0) + loot.crystals;
+  }
+  
+  // Save updated data
+  data.players[normalizedAttacker] = { ...attacker, lastUpdated: Date.now() };
+  data.players[normalizedDefender] = { ...defender, lastUpdated: Date.now() };
+  saveData(data);
+  
+  res.json({
+    success: true,
+    victory,
+    battle: {
+      attackerShipsLost,
+      defenderShipsLost,
+      powerRatio: powerRatio.toFixed(2),
+    },
+    loot: victory ? loot : null,
+    message: victory 
+      ? `Victory! You captured ${loot.iron} iron, ${loot.deuterium} deuterium, and ${loot.crystals} crystals!`
+      : `Defeat! Your fleet was repelled. You lost ${attackerShipsLost} ships.`,
+  });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Linera Dominion API running on port ${PORT}`);
