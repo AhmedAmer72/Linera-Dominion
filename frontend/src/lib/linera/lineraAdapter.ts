@@ -181,61 +181,36 @@ class LineraAdapterClass {
       console.log('👛 Creating Linera wallet...');
       const wallet = await faucet.createWallet();
       
-      // Step 5: Create deterministic signer
-      // Check what methods are available on PrivateKey
-      console.log('🔑 Creating signer...');
-      console.log('   Available PrivateKey methods:', Object.keys(signerModule.PrivateKey));
+      // Step 5: Create DETERMINISTIC signer from the seed
+      // The seed is derived from MetaMask signature, so same signature = same Linera identity
+      console.log('🔑 Creating deterministic signer from Web3 signature...');
       
-      let autoSigner;
-      let storedKeyHex = localStorage.getItem(`linera_privkey_${web3Address}`);
+      // Convert seed bytes to hex string (this is the private key)
+      const privateKeyHex = '0x' + Array.from(seed).map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log(`   Private key derived from signature (first 10 chars): ${privateKeyHex.slice(0, 12)}...`);
       
-      if (storedKeyHex) {
-        // Try to restore from stored key
-        console.log('📂 Found stored private key, attempting restore...');
-        try {
-          // Try different methods to create from stored key
-          if (typeof signerModule.PrivateKey.fromHex === 'function') {
-            autoSigner = signerModule.PrivateKey.fromHex(storedKeyHex);
-          } else if (typeof signerModule.PrivateKey.from === 'function') {
-            autoSigner = signerModule.PrivateKey.from(storedKeyHex);
-          } else {
-            // Fallback to creating new random key
-            console.log('⚠️ Cannot restore key, creating new one...');
-            autoSigner = signerModule.PrivateKey.createRandom();
-            // Store the new key
-            if (typeof autoSigner.toHex === 'function') {
-              localStorage.setItem(`linera_privkey_${web3Address}`, autoSigner.toHex());
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ Failed to restore key:', e);
-          autoSigner = signerModule.PrivateKey.createRandom();
-        }
-      } else {
-        // Create new random key and try to store it
-        console.log('🔑 Creating new random signer...');
-        autoSigner = signerModule.PrivateKey.createRandom();
-        
-        // Try to export and store the key for future sessions
-        try {
-          if (typeof autoSigner.toHex === 'function') {
-            const keyHex = autoSigner.toHex();
-            localStorage.setItem(`linera_privkey_${web3Address}`, keyHex);
-            console.log('💾 Stored private key for future sessions');
-          } else if (typeof autoSigner.toString === 'function') {
-            const keyStr = autoSigner.toString();
-            localStorage.setItem(`linera_privkey_${web3Address}`, keyStr);
-            console.log('💾 Stored private key for future sessions');
-          } else {
-            console.log('⚠️ Cannot export private key for storage');
-          }
-        } catch (e) {
-          console.warn('⚠️ Could not store private key:', e);
-        }
-      }
+      // Create PrivateKey using constructor with hex string
+      // The Linera SDK PrivateKey constructor takes a hex private key directly
+      const autoSigner = new signerModule.PrivateKey(privateKeyHex);
+      console.log('✅ Deterministic signer created from Web3 signature!');
       
       const autoSignerAddress = autoSigner.address();
       console.log(`   Linera address: ${autoSignerAddress}`);
+      
+      // Verify address consistency (same signature should always produce same address)
+      const storedLineraAddress = localStorage.getItem(`linera_address_${web3Address}`);
+      if (storedLineraAddress) {
+        if (storedLineraAddress === autoSignerAddress) {
+          console.log('✅ Linera address is consistent with previous session!');
+        } else {
+          console.warn('⚠️ Linera address changed! Previous:', storedLineraAddress, 'New:', autoSignerAddress);
+          // Clear old chain since address changed
+          localStorage.removeItem(`linera_chain_${web3Address}`);
+        }
+      } else {
+        console.log('💾 Storing Linera address for future verification...');
+      }
+      localStorage.setItem(`linera_address_${web3Address}`, autoSignerAddress);
       
       // Step 6: Check if we already have a chain for this address
       const storedChainId = localStorage.getItem(`linera_chain_${web3Address}`);
@@ -250,7 +225,7 @@ class LineraAdapterClass {
           await wallet.setOwner(chainId, autoSignerAddress);
           console.log('✅ Reconnected to existing chain!');
         } catch (e) {
-          console.log('⚠️ Could not reconnect to stored chain, claiming new one...');
+          console.log('⚠️ Could not reconnect to stored chain, claiming new one...', e);
           chainId = await faucet.claimChain(wallet, autoSignerAddress);
           localStorage.setItem(`linera_chain_${web3Address}`, chainId);
           console.log(`✅ Claimed new chain: ${chainId}`);
