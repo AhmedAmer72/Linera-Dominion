@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { useGameStore } from '@/store/gameStore';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { getGalaxyPlayers, getInvasionInfo, executeInvasion, GalaxyPlayer, InvasionInfo, InvasionResult } from '@/lib/leaderboardApi';
+import { useLinera } from '@/lib/linera/LineraProvider';
+import { LAUNCH_INVASION } from '@/lib/linera/queries';
 
 // Fleet icon with fallback for galaxy view
 function GalaxyFleetIcon({ size, fallback = '🚀' }: { size: number; fallback?: string }) {
@@ -808,7 +810,8 @@ interface PlayerDetailsPanelProps {
 }
 
 function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: PlayerDetailsPanelProps) {
-  const { fleets, resources, addResources } = useGameStore();
+  const { fleets, resources, addResources, chainId } = useGameStore();
+  const { mutate, isConnected } = useLinera();
   const [invasionInfo, setInvasionInfo] = useState<InvasionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [invading, setInvading] = useState(false);
@@ -829,12 +832,42 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
     fetchInfo();
   }, [player.address, myAddress]);
   
-  // Handle invasion
+  // Handle invasion via Linera contract
   const handleInvade = async () => {
     if (!invasionInfo?.invasion.canInvade) return;
     
     setInvading(true);
     try {
+      // First, try to call the Linera contract if connected
+      if (isConnected && mutate) {
+        try {
+          // Find the first available fleet for the invasion
+          const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
+          const fleetId = attackFleet ? parseInt(attackFleet.id.replace('fleet-', '')) || 1 : 1;
+          
+          console.log('🚀 Launching invasion via Linera contract...');
+          console.log('📍 Target chain:', player.chainId || player.address);
+          console.log('🎯 Target coords:', player.homeX, player.homeY);
+          
+          // Call the smart contract's launchInvasion mutation
+          // Note: targetChain should be the player's chainId if available
+          const targetChain = player.chainId || player.address;
+          
+          await mutate(LAUNCH_INVASION, {
+            targetChain: targetChain,
+            fleetId: fleetId,
+            targetX: player.homeX || 0,
+            targetY: player.homeY || 0,
+          });
+          
+          console.log('✅ Invasion launched on-chain successfully!');
+        } catch (lineraError) {
+          console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
+        }
+      }
+      
+      // Execute battle simulation (backend mock for now)
+      // In full implementation, this would listen for InvasionResult messages
       const result = await executeInvasion(myAddress, player.address);
       if (result) {
         setBattleResult(result);

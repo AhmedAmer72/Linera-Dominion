@@ -383,6 +383,8 @@ pub enum DominionError {
 /// Application parameters
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 pub struct DominionParameters {
+    /// Player name
+    pub player_name: String,
     /// Starting iron amount
     pub starting_iron: u64,
     /// Starting deuterium amount  
@@ -400,6 +402,7 @@ pub struct DominionParameters {
 impl Default for DominionParameters {
     fn default() -> Self {
         Self {
+            player_name: "Commander".to_string(),
             starting_iron: 500,
             starting_deuterium: 200,
             starting_crystals: 50,

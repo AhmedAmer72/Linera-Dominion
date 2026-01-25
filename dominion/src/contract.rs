@@ -10,7 +10,7 @@ use linera_sdk::{
 use linera_dominion::{
     DominionState, DominionAbi, DominionError, DominionParameters,
     Operation, Message, BuildingType, ShipType, Technology,
-    state::{BuildingData, AllianceData},
+    state::{self, BuildingData, AllianceData},
 };
 use linera_dominion_common::coordinates::Coordinate;
 
@@ -39,8 +39,21 @@ impl Contract for DominionContract {
     }
 
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
-        // Validate that the application parameters were configured correctly.
-        self.runtime.application_parameters();
+        // Get the application parameters
+        let params = self.runtime.application_parameters();
+        
+        // Initialize the state with player parameters
+        self.state.name_mut().set(params.player_name);
+        self.state.home_x_mut().set(params.home_x);
+        self.state.home_y_mut().set(params.home_y);
+        
+        // Initialize wallet with starting resources from params
+        self.state.wallet_mut().set(state::WalletData {
+            iron: params.starting_iron,
+            deuterium: params.starting_deuterium,
+            crystals: params.starting_crystals,
+            last_update_micros: 0,
+        });
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Result<(), DominionError> {

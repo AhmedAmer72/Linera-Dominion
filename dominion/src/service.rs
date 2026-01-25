@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use async_graphql::{Object, Request, Response, Schema, EmptySubscription};
 use linera_sdk::{
-    linera_base_types::WithServiceAbi,
+    linera_base_types::{WithServiceAbi, ChainId},
     Service, ServiceRuntime,
     views::View,
 };
@@ -177,6 +177,84 @@ impl MutationRoot {
     /// Recall fleet
     async fn recall_fleet(&self, fleet_id: u64) -> Vec<u8> {
         let operation = Operation::RecallFleet { fleet_id };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    // ===== Diplomacy Mutations =====
+    
+    /// Propose alliance with another player
+    async fn propose_alliance(&self, target_chain: ChainId, alliance_name: String) -> Vec<u8> {
+        let operation = Operation::ProposeAlliance { target_chain, alliance_name };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Accept alliance proposal
+    async fn accept_alliance_proposal(&self, proposal_id: u64) -> Vec<u8> {
+        let operation = Operation::AcceptAllianceProposal { proposal_id };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Reject alliance proposal
+    async fn reject_alliance_proposal(&self, proposal_id: u64) -> Vec<u8> {
+        let operation = Operation::RejectAllianceProposal { proposal_id };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Declare war on another player
+    async fn declare_war(&self, target_chain: ChainId) -> Vec<u8> {
+        let operation = Operation::DeclareWar { target_chain };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Propose peace treaty
+    async fn propose_peace(&self, target_chain: ChainId) -> Vec<u8> {
+        let operation = Operation::ProposePeace { target_chain };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Accept peace treaty
+    async fn accept_peace(&self, proposal_id: u64) -> Vec<u8> {
+        let operation = Operation::AcceptPeace { proposal_id };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    // ===== Invasion Mutations =====
+    
+    /// Launch invasion against another player's territory
+    async fn launch_invasion(
+        &self,
+        target_chain: ChainId,
+        fleet_id: u64,
+        target_x: i64,
+        target_y: i64,
+    ) -> Vec<u8> {
+        let operation = Operation::LaunchInvasion { 
+            target_chain, 
+            fleet_id, 
+            target_x, 
+            target_y 
+        };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Defend against incoming invasion
+    async fn defend_invasion(&self, invasion_id: u64, defender_fleet_id: u64) -> Vec<u8> {
+        let operation = Operation::DefendInvasion { invasion_id, defender_fleet_id };
+        self.runtime.schedule_operation(&operation);
+        vec![]
+    }
+    
+    /// Claim invasion rewards after victory
+    async fn claim_invasion_rewards(&self, invasion_id: u64) -> Vec<u8> {
+        let operation = Operation::ClaimInvasionRewards { invasion_id };
         self.runtime.schedule_operation(&operation);
         vec![]
     }

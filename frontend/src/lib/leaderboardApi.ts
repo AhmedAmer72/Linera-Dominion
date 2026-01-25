@@ -167,6 +167,7 @@ export async function checkApiHealth(): Promise<boolean> {
 
 export interface GalaxyPlayer {
   address: string;
+  chainId?: string;  // Linera chain ID for cross-chain operations
   playerName: string;
   homeX: number;
   homeY: number;

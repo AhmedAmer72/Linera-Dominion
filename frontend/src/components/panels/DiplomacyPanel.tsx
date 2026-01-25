@@ -5,6 +5,8 @@ import { useGameStore } from '@/store/gameStore';
 import { useState, useEffect, useCallback } from 'react';
 import { getGalaxyPlayers, executeInvasion, GalaxyPlayer } from '@/lib/leaderboardApi';
 import { lineraAdapter } from '@/lib/linera';
+import { useLinera } from '@/lib/linera/LineraProvider';
+import { LAUNCH_INVASION } from '@/lib/linera/queries';
 
 interface AllianceProposal {
   id: number;
@@ -98,13 +100,38 @@ export function DiplomacyPanel() {
     setActionLoading(false);
   };
 
-  // Handle launch invasion
+  // Get Linera connection
+  const { mutate, isConnected } = useLinera();
+
+  // Handle launch invasion - uses Linera contract + backend simulation
   const handleLaunchInvasion = async () => {
     if (!selectedPlayer || !web3Address) return;
     
     setActionLoading(true);
     try {
-      // Use backend API for now (until contract is deployed)
+      // First, call Linera contract if connected
+      if (isConnected && mutate) {
+        try {
+          const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
+          const fleetId = attackFleet ? parseInt(attackFleet.id.replace('fleet-', '')) || 1 : 1;
+          
+          console.log('🚀 Launching invasion via Linera contract...');
+          const targetChain = selectedPlayer.chainId || selectedPlayer.address;
+          
+          await mutate(LAUNCH_INVASION, {
+            targetChain: targetChain,
+            fleetId: fleetId,
+            targetX: selectedPlayer.homeX || 0,
+            targetY: selectedPlayer.homeY || 0,
+          });
+          
+          console.log('✅ Invasion launched on-chain successfully!');
+        } catch (lineraError) {
+          console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
+        }
+      }
+      
+      // Execute battle simulation via backend
       const result = await executeInvasion(web3Address, selectedPlayer.address);
       
       if (result?.victory) {
