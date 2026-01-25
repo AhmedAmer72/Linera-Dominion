@@ -843,7 +843,7 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
         try {
           // Find the first available fleet for the invasion
           const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
-          const fleetId = attackFleet ? (typeof attackFleet.id === 'string' ? parseInt(attackFleet.id.replace('fleet-', '')) : attackFleet.id) || 1 : 1;
+          const fleetId = attackFleet?.id ?? 1;
           
           console.log('🚀 Launching invasion via Linera contract...');
           console.log('📍 Target chain:', player.chainId || player.address);

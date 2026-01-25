@@ -113,7 +113,7 @@ export function DiplomacyPanel() {
       if (isConnected && mutate) {
         try {
           const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
-          const fleetId = attackFleet ? (typeof attackFleet.id === 'string' ? parseInt(attackFleet.id.replace('fleet-', '')) : attackFleet.id) || 1 : 1;
+          const fleetId = attackFleet?.id ?? 1;
           
           console.log('🚀 Launching invasion via Linera contract...');
           const targetChain = selectedPlayer.chainId || selectedPlayer.address;
