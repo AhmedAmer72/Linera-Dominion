@@ -17,6 +17,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',') 
+    : ['http://localhost:3000', 'http://localhost:3001', 'https://linera-dominion.vercel.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
 // Data file path
 const DATA_FILE = path.join(__dirname, 'data', 'players.json');
 
@@ -31,7 +41,7 @@ if (!fs.existsSync(DATA_FILE)) {
 }
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 /**
@@ -453,8 +463,8 @@ app.post('/api/galaxy/invade', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Linera Dominion API running on port ${PORT}`);
-  console.log(`📊 Leaderboard: http://localhost:${PORT}/api/leaderboard`);
-  console.log(`❤️  Health: http://localhost:${PORT}/api/health`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`❤️  Health: /api/health`);
 });

@@ -10,7 +10,7 @@ use linera_sdk::{
     views::View,
 };
 use linera_dominion::{
-    DominionAbi, Operation, BuildingType, ShipType, Technology,
+    DominionAbi, DominionParameters, Operation, BuildingType, ShipType, Technology,
 };
 use linera_dominion::state::DominionState;
 
@@ -26,7 +26,7 @@ impl WithServiceAbi for DominionService {
 }
 
 impl Service for DominionService {
-    type Parameters = ();
+    type Parameters = DominionParameters;
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
         let state = DominionState::load(runtime.root_view_storage_context())

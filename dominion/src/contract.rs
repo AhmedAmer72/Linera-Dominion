@@ -39,17 +39,8 @@ impl Contract for DominionContract {
     }
 
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
-        let params = self.runtime.application_parameters();
-        let now = self.runtime.system_time();
-        
-        let home = Coordinate::new(params.home_x, params.home_y);
-        self.state.initialize(
-            home,
-            params.starting_iron,
-            params.starting_deuterium,
-            params.starting_crystals,
-            now.micros(),
-        );
+        // Validate that the application parameters were configured correctly.
+        self.runtime.application_parameters();
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Result<(), DominionError> {

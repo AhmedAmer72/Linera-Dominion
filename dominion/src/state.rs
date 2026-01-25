@@ -263,6 +263,26 @@ impl DominionState {
         &mut self.alliance
     }
     
+    pub fn diplomacy_mut(&mut self) -> &mut MapView<String, DiplomacyData> {
+        &mut self.diplomacy
+    }
+    
+    pub fn proposals_mut(&mut self) -> &mut MapView<u64, ProposalData> {
+        &mut self.proposals
+    }
+    
+    pub fn proposal_count_mut(&mut self) -> &mut RegisterView<u64> {
+        &mut self.proposal_count
+    }
+    
+    pub fn invasions_mut(&mut self) -> &mut MapView<u64, InvasionData> {
+        &mut self.invasions
+    }
+    
+    pub fn invasion_count_mut(&mut self) -> &mut RegisterView<u64> {
+        &mut self.invasion_count
+    }
+    
     // --- Business logic ---
     
     /// Initialize a new dominion
@@ -286,6 +306,8 @@ impl DominionState {
         self.fleet_count.set(0);
         self.trade_count.set(0);
         self.alliance.set(None);
+        self.proposal_count.set(0);
+        self.invasion_count.set(0);
     }
     
     /// Update wallet with time-based resource production
