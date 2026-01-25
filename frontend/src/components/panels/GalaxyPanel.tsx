@@ -808,7 +808,7 @@ interface PlayerDetailsPanelProps {
 }
 
 function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: PlayerDetailsPanelProps) {
-  const { fleets, resources } = useGameStore();
+  const { fleets, resources, addResources } = useGameStore();
   const [invasionInfo, setInvasionInfo] = useState<InvasionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [invading, setInvading] = useState(false);
@@ -838,6 +838,17 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
       const result = await executeInvasion(myAddress, player.address);
       if (result) {
         setBattleResult(result);
+        
+        // Add loot to player's resources if victory
+        if (result.victory && result.loot) {
+          addResources({
+            iron: result.loot.iron,
+            deuterium: result.loot.deuterium,
+            crystals: result.loot.crystals,
+          });
+          console.log('💰 Loot added to resources:', result.loot);
+        }
+        
         onInvasionComplete(); // Refresh galaxy players
       }
     } catch (e) {

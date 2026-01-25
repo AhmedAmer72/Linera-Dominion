@@ -15,7 +15,7 @@ interface AllianceProposal {
 }
 
 export function DiplomacyPanel() {
-  const { web3Address, fleets } = useGameStore();
+  const { web3Address, fleets, addResources } = useGameStore();
   const [tab, setTab] = useState<'relations' | 'proposals' | 'wars'>('relations');
   const [galaxyPlayers, setGalaxyPlayers] = useState<GalaxyPlayer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,6 +108,16 @@ export function DiplomacyPanel() {
       const result = await executeInvasion(web3Address, selectedPlayer.address);
       
       if (result?.victory) {
+        // Add loot to player's resources
+        if (result.loot) {
+          addResources({
+            iron: result.loot.iron,
+            deuterium: result.loot.deuterium,
+            crystals: result.loot.crystals,
+          });
+          console.log('💰 Loot added to resources:', result.loot);
+        }
+        
         setActionResult({ 
           success: true, 
           message: `Victory! Captured ${result.loot?.iron || 0} iron, ${result.loot?.deuterium || 0} deuterium, ${result.loot?.crystals || 0} crystals!` 
