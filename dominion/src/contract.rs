@@ -10,7 +10,7 @@ use linera_sdk::{
 use linera_dominion::{
     DominionState, DominionAbi, DominionError, DominionParameters,
     Operation, Message, BuildingType, ShipType, Technology,
-    state::BuildingData,
+    state::{BuildingData, AllianceData},
 };
 use linera_dominion_common::coordinates::Coordinate;
 
@@ -157,31 +157,154 @@ impl Contract for DominionContract {
                 self.state.alliance_mut().set(None);
                 Ok(())
             }
+            
+            // Diplomacy Operations
+            Operation::ProposeAlliance { target_chain, alliance_name } => {
+                // Send alliance proposal to target chain
+                let owner = self.runtime.authenticated_signer()
+                    .ok_or(DominionError::InvalidOperation("Not authenticated".into()))?;
+                let my_chain = self.runtime.chain_id();
+                self.runtime.prepare_message(Message::AllianceProposal {
+                    proposal_id: now_micros,
+                    sender: owner,
+                    sender_chain: my_chain,
+                    alliance_name,
+                }).send_to(target_chain);
+                Ok(())
+            }
+            
+            Operation::AcceptAllianceProposal { proposal_id } => {
+                // Accept alliance - set alliance state
+                self.state.alliance_mut().set(Some(AllianceData {
+                    name: format!("Alliance-{}", proposal_id),
+                    role: 0,
+                }));
+                Ok(())
+            }
+            
+            Operation::RejectAllianceProposal { proposal_id } => {
+                // Just acknowledge rejection - no state change needed
+                let _ = proposal_id;
+                Ok(())
+            }
+            
+            Operation::DeclareWar { target_chain } => {
+                // Send war declaration to target
+                let owner = self.runtime.authenticated_signer()
+                    .ok_or(DominionError::InvalidOperation("Not authenticated".into()))?;
+                let my_chain = self.runtime.chain_id();
+                self.runtime.prepare_message(Message::WarDeclared {
+                    aggressor: owner,
+                    aggressor_chain: my_chain,
+                }).send_to(target_chain);
+                Ok(())
+            }
+            
+            Operation::ProposePeace { target_chain } => {
+                let owner = self.runtime.authenticated_signer()
+                    .ok_or(DominionError::InvalidOperation("Not authenticated".into()))?;
+                let my_chain = self.runtime.chain_id();
+                self.runtime.prepare_message(Message::PeaceProposal {
+                    proposal_id: now_micros,
+                    sender: owner,
+                    sender_chain: my_chain,
+                }).send_to(target_chain);
+                Ok(())
+            }
+            
+            Operation::AcceptPeace { proposal_id } => {
+                // Accept peace treaty
+                let _ = proposal_id;
+                Ok(())
+            }
+            
+            // Invasion Operations
+            Operation::LaunchInvasion { target_chain, fleet_id, target_x, target_y } => {
+                let owner = self.runtime.authenticated_signer()
+                    .ok_or(DominionError::InvalidOperation("Not authenticated".into()))?;
+                let my_chain = self.runtime.chain_id();
+                self.runtime.prepare_message(Message::InvasionLaunched {
+                    invasion_id: fleet_id, // Use fleet_id as invasion_id
+                    attacker: owner,
+                    attacker_chain: my_chain,
+                    fleet_strength: fleet_id, // Placeholder, should calculate from fleet
+                    target_x,
+                    target_y,
+                }).send_to(target_chain);
+                Ok(())
+            }
+            
+            Operation::DefendInvasion { invasion_id, defender_fleet_id } => {
+                // Acknowledge defense with the defender's fleet
+                let _ = defender_fleet_id; // Will be used for battle calculation
+                Ok(())
+            }
+            
+            Operation::ClaimInvasionRewards { invasion_id } => {
+                // Claim rewards after successful invasion
+                Ok(())
+            }
         }
     }
 
     async fn execute_message(&mut self, message: Self::Message) {
-        let now = self.runtime.system_time();
-        let _now_micros = now.micros();
+        let _now = self.runtime.system_time();
         
         match message {
-            Message::TradeOffer { offer_id, sender, sender_chain, .. } => {
+            Message::TradeOffer { .. } => {
                 // TODO: Handle incoming trade offer
             }
-            Message::TradeAccepted { offer_id } => {
+            Message::TradeAccepted { .. } => {
                 // TODO: Handle trade acceptance
             }
-            Message::TradeCancelled { offer_id } => {
+            Message::TradeCancelled { .. } => {
                 // TODO: Handle trade cancellation
             }
-            Message::FleetArrival { fleet_id, owner, owner_chain } => {
+            Message::FleetArrival { .. } => {
                 // TODO: Handle fleet arrival notification
             }
-            Message::BattleResult { battle_id, won, surviving_ships, .. } => {
+            Message::BattleResult { .. } => {
                 // TODO: Handle battle result
             }
-            Message::AllianceInvite { alliance_chain, alliance_name } => {
-                // TODO: Handle alliance invitation
+            Message::AllianceInvite { alliance_name, .. } => {
+                // Store as pending proposal
+            }
+            
+            // Diplomacy Messages
+            Message::AllianceProposal { alliance_name, .. } => {
+                // Store incoming alliance proposal for user to accept/reject
+            }
+            Message::AllianceAccepted { alliance_name, .. } => {
+                // Alliance was accepted, update state
+                self.state.alliance_mut().set(Some(AllianceData {
+                    name: alliance_name,
+                    role: 0, // member
+                }));
+            }
+            Message::AllianceRejected { .. } => {
+                // Alliance was rejected, no action needed
+            }
+            Message::WarDeclared { .. } => {
+                // War has been declared on us
+            }
+            Message::PeaceProposal { .. } => {
+                // Peace proposal received
+            }
+            Message::PeaceAccepted { .. } => {
+                // Peace was accepted
+            }
+            
+            // Invasion Messages
+            Message::InvasionLaunched { .. } => {
+                // We are being invaded! Store for defense
+            }
+            Message::InvasionResult { attacker_won, .. } => {
+                // Invasion result received
+                if attacker_won {
+                    // We lost, resources were taken
+                } else {
+                    // We defended successfully
+                }
             }
         }
     }

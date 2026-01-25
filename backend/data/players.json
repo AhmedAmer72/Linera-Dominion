@@ -6,8 +6,8 @@
       "homeX": 100,
       "homeY": 100,
       "resources": {
-        "iron": 74.66666666666522,
-        "deuterium": 21.29999999999997,
+        "iron": 188.4999999999904,
+        "deuterium": 55.04999999999936,
         "crystals": 0
       },
       "buildings": [
@@ -30,7 +30,7 @@
       ],
       "fleets": [],
       "research": [],
-      "lastUpdated": 1769218627990
+      "lastUpdated": 1769227415271
     },
     "0xeb5c812e8238135600b7535e871b9817e17a969e": {
       "address": "0xeb5c812e8238135600b7535e871b9817e17a969e",
