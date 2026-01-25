@@ -101,7 +101,7 @@ export function DiplomacyPanel() {
   };
 
   // Get Linera connection
-  const { mutate, isConnected } = useLinera();
+  const { mutate, isConnected, isAppConnected } = useLinera();
 
   // Handle launch invasion - uses Linera contract + backend simulation
   const handleLaunchInvasion = async () => {
@@ -116,6 +116,7 @@ export function DiplomacyPanel() {
           const fleetId = attackFleet?.id ?? 1;
           
           console.log('🚀 Launching invasion via Linera contract...');
+          console.log('🔗 Wallet connected:', isConnected, 'App connected:', isAppConnected);
           const targetChain = selectedPlayer.chainId || selectedPlayer.address;
           
           await mutate(LAUNCH_INVASION, {
@@ -129,6 +130,8 @@ export function DiplomacyPanel() {
         } catch (lineraError) {
           console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
         }
+      } else {
+        console.log('⚠️ Not connected to Linera, using mock invasion');
       }
       
       // Execute battle simulation via backend

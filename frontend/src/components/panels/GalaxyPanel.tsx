@@ -811,7 +811,7 @@ interface PlayerDetailsPanelProps {
 
 function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: PlayerDetailsPanelProps) {
   const { fleets, resources, addResources, chainId } = useGameStore();
-  const { mutate, isConnected } = useLinera();
+  const { mutate, isConnected, isAppConnected } = useLinera();
   const [invasionInfo, setInvasionInfo] = useState<InvasionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [invading, setInvading] = useState(false);
@@ -839,6 +839,7 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
     setInvading(true);
     try {
       // First, try to call the Linera contract if connected
+      // Use isConnected as mutate will auto-connect to app if needed
       if (isConnected && mutate) {
         try {
           // Find the first available fleet for the invasion
@@ -848,6 +849,7 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
           console.log('🚀 Launching invasion via Linera contract...');
           console.log('📍 Target chain:', player.chainId || player.address);
           console.log('🎯 Target coords:', player.homeX, player.homeY);
+          console.log('🔗 Wallet connected:', isConnected, 'App connected:', isAppConnected);
           
           // Call the smart contract's launchInvasion mutation
           // Note: targetChain should be the player's chainId if available
@@ -864,6 +866,8 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
         } catch (lineraError) {
           console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
         }
+      } else {
+        console.log('⚠️ Not connected to Linera, using mock invasion');
       }
       
       // Execute battle simulation (backend mock for now)

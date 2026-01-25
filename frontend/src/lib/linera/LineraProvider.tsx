@@ -8,6 +8,7 @@ import { lineraAdapter } from './lineraAdapter';
  */
 interface LineraContextType {
   isConnected: boolean;
+  isAppConnected: boolean;
   isConnecting: boolean;
   chainId: string | null;
   error: string | null;
@@ -38,6 +39,7 @@ interface LineraProviderProps {
  */
 export function LineraProvider({ children }: LineraProviderProps) {
   const [isConnected, setIsConnected] = useState(false);
+  const [isAppConnected, setIsAppConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [chainId, setChainId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +48,15 @@ export function LineraProvider({ children }: LineraProviderProps) {
   useEffect(() => {
     const handleStateChange = () => {
       const connection = lineraAdapter.getConnection();
-      setIsConnected(lineraAdapter.isConnected());
+      const walletConnected = lineraAdapter.isConnected();
+      const appConnected = lineraAdapter.isApplicationConnected();
+      
+      setIsConnected(walletConnected);
+      setIsAppConnected(appConnected);
       setChainId(connection?.chainId || null);
+      
+      // Debug logging
+      console.log('🔄 Linera state changed:', { walletConnected, appConnected, chainId: connection?.chainId });
     };
 
     // Check initial state
@@ -56,8 +65,12 @@ export function LineraProvider({ children }: LineraProviderProps) {
     // Subscribe to changes using the subscribe method
     const unsubscribe = lineraAdapter.subscribe(handleStateChange);
 
+    // Also poll every 2 seconds to catch state changes
+    const pollInterval = setInterval(handleStateChange, 2000);
+
     return () => {
       unsubscribe();
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -91,9 +104,27 @@ export function LineraProvider({ children }: LineraProviderProps) {
     mutation: string,
     variables?: Record<string, unknown>
   ): Promise<T> => {
+    // Check if application is connected
     if (!lineraAdapter.isApplicationConnected()) {
-      throw new Error('Not connected to Linera application');
+      // Try to connect to app if wallet is connected
+      if (lineraAdapter.isConnected()) {
+        const appId = lineraAdapter.getApplicationId();
+        if (appId) {
+          console.log('🔄 Attempting to connect to application...');
+          try {
+            await lineraAdapter.connectApplication(appId);
+          } catch (e) {
+            console.warn('⚠️ Could not connect to application:', e);
+            throw new Error('Failed to connect to Linera application');
+          }
+        }
+      } else {
+        throw new Error('Not connected to Linera - please connect wallet first');
+      }
     }
+    
+    console.log('📤 Sending mutation:', mutation);
+    console.log('📤 Variables:', variables);
     
     return lineraAdapter.mutate<T>(mutation, variables);
   }, []);
@@ -112,6 +143,7 @@ export function LineraProvider({ children }: LineraProviderProps) {
 
   const value: LineraContextType = {
     isConnected,
+    isAppConnected,
     isConnecting,
     chainId,
     error,
@@ -139,6 +171,7 @@ export function useLinera(): LineraContextType {
     // This allows components to use the hook outside the provider
     return {
       isConnected: false,
+      isAppConnected: false,
       isConnecting: false,
       chainId: null,
       error: null,

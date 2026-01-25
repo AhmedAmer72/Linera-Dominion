@@ -230,6 +230,7 @@ export const ACCEPT_PEACE = `
 
 /**
  * Launch invasion against another player
+ * Note: targetChain is ChainId (String), fleetId is u64 (Int)
  */
 export const LAUNCH_INVASION = `
   mutation LaunchInvasion($targetChain: String!, $fleetId: Int!, $targetX: Int!, $targetY: Int!) {
