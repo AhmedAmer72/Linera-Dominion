@@ -46,6 +46,15 @@ export function useWallet() {
   const connectWallet = useCallback(async () => {
     if (isConnecting || connected) return;
     
+    // Check for Firefox - Linera WASM has compatibility issues with Firefox
+    if (typeof navigator !== 'undefined') {
+      const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+      if (isFirefox) {
+        setWalletError('Firefox is not supported. Please use Chrome, Edge, or Brave browser for Linera wallet connection.');
+        return;
+      }
+    }
+    
     setConnecting(true);
     setWalletError(null);
     
@@ -150,6 +159,16 @@ export function useWallet() {
     if (restoreAttemptedRef.current || isRestoringRef.current) {
       console.log('⏭️ Restore already attempted or in progress, skipping...');
       return false;
+    }
+    
+    // Check for Firefox - Linera WASM has compatibility issues with Firefox
+    if (typeof navigator !== 'undefined') {
+      const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+      if (isFirefox) {
+        console.log('⚠️ Firefox detected - skipping Linera restore (not supported)');
+        restoreAttemptedRef.current = true;
+        return false;
+      }
     }
     
     // Mark as attempting
