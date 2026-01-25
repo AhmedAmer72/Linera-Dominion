@@ -46,12 +46,12 @@ function ResourceCostIcon({ src, fallback }: { src: string; fallback: string }) 
 }
 
 const shipTypes = [
-  { type: 'Scout', icon: '🛸', iconSrc: '/images/ships/scout.png', attack: 10, defense: 5, speed: 100, cargo: 50, cost: { iron: 100, deuterium: 50, crystals: 0 } },
-  { type: 'Fighter', icon: '✈️', iconSrc: '/images/ships/scout.png', attack: 50, defense: 25, speed: 80, cargo: 20, cost: { iron: 200, deuterium: 100, crystals: 10 } },
-  { type: 'Cruiser', icon: '🚀', iconSrc: '/images/ships/battlecruiser.png', attack: 150, defense: 100, speed: 50, cargo: 100, cost: { iron: 500, deuterium: 250, crystals: 50 } },
-  { type: 'Battleship', icon: '🛳️', iconSrc: '/images/ships/battlecruiser.png', attack: 400, defense: 300, speed: 30, cargo: 200, cost: { iron: 1500, deuterium: 750, crystals: 150 } },
-  { type: 'Carrier', icon: '🚢', iconSrc: '/images/ships/carrier.png', attack: 100, defense: 500, speed: 20, cargo: 1000, cost: { iron: 2000, deuterium: 1000, crystals: 200 } },
-  { type: 'Dreadnought', icon: '⚔️', iconSrc: '/images/ships/dreadnought.png', attack: 800, defense: 600, speed: 15, cargo: 500, cost: { iron: 5000, deuterium: 2500, crystals: 500 } },
+  { type: 'Scout', icon: '🛸', iconSrc: '/images/ships/scout.png', attack: 10, defense: 5, speed: 100, cargo: 50, cost: { iron: 200, deuterium: 50, crystals: 0 } },
+  { type: 'Fighter', icon: '✈️', iconSrc: '/images/ships/scout.png', attack: 50, defense: 25, speed: 80, cargo: 20, cost: { iron: 500, deuterium: 150, crystals: 25 } },
+  { type: 'Cruiser', icon: '🚀', iconSrc: '/images/ships/battlecruiser.png', attack: 150, defense: 100, speed: 50, cargo: 100, cost: { iron: 1500, deuterium: 500, crystals: 100 } },
+  { type: 'Battleship', icon: '🛳️', iconSrc: '/images/ships/battlecruiser.png', attack: 400, defense: 300, speed: 30, cargo: 200, cost: { iron: 5000, deuterium: 2000, crystals: 500 } },
+  { type: 'Carrier', icon: '🚢', iconSrc: '/images/ships/carrier.png', attack: 100, defense: 500, speed: 20, cargo: 1000, cost: { iron: 8000, deuterium: 4000, crystals: 1000 } },
+  { type: 'Dreadnought', icon: '⚔️', iconSrc: '/images/ships/dreadnought.png', attack: 800, defense: 600, speed: 15, cargo: 500, cost: { iron: 20000, deuterium: 10000, crystals: 5000 } },
 ];
 
 export function FleetsPanel() {
@@ -386,9 +386,22 @@ function BuildShipsModal({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <ResourceCostIcon src="/images/resources/iron.png" fallback="⛏️" />
-                  <span className="font-display text-xs text-gray-300">{ship.cost.iron}</span>
+                {/* Resource costs */}
+                <div className="flex flex-col gap-1 text-right">
+                  <div className="flex items-center gap-1 justify-end">
+                    <ResourceCostIcon src="/images/resources/iron.png" fallback="⛏️" />
+                    <span className="font-display text-xs text-gray-300 w-10">{ship.cost.iron}</span>
+                  </div>
+                  <div className="flex items-center gap-1 justify-end">
+                    <ResourceCostIcon src="/images/resources/deuterium.png" fallback="💧" />
+                    <span className="font-display text-xs text-gray-300 w-10">{ship.cost.deuterium}</span>
+                  </div>
+                  {ship.cost.crystals > 0 && (
+                    <div className="flex items-center gap-1 justify-end">
+                      <ResourceCostIcon src="/images/resources/crystals.png" fallback="💎" />
+                      <span className="font-display text-xs text-gray-300 w-10">{ship.cost.crystals}</span>
+                    </div>
+                  )}
                 </div>
                 <input
                   type="number"
