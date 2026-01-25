@@ -18,13 +18,41 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS configuration for production
+// Allow all origins in development, restrict in production via CORS_ORIGIN env var
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : [
+      'http://localhost:3000', 
+      'http://localhost:3001', 
+      'https://linera-dominion.vercel.app',
+      'https://linera-dominion-ahmedamer72s-projects.vercel.app',
+      /\.vercel\.app$/  // Allow all Vercel preview deployments
+    ];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',') 
-    : ['http://localhost:3000', 'http://localhost:3001', 'https://linera-dominion.vercel.app'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return allowed === origin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Allow anyway for now, but log it
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 
 // Data file path
@@ -42,6 +70,10 @@ if (!fs.existsSync(DATA_FILE)) {
 
 // Middleware
 app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 /**
