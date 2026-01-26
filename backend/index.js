@@ -450,6 +450,20 @@ app.post('/api/galaxy/invade', (req, res) => {
   const normalizedAttacker = attackerAddress.toLowerCase();
   const normalizedDefender = defenderAddress.toLowerCase();
   
+  // Check if players are allied - cannot invade an ally
+  const allianceData = loadAlliances();
+  const isAllied = allianceData.alliances.some(a =>
+    (a.player1 === normalizedAttacker && a.player2 === normalizedDefender) ||
+    (a.player1 === normalizedDefender && a.player2 === normalizedAttacker)
+  );
+  
+  if (isAllied) {
+    return res.status(400).json({ 
+      error: 'Cannot invade an ally! End the alliance first.',
+      isAlly: true
+    });
+  }
+  
   const data = loadData();
   const attacker = data.players[normalizedAttacker];
   const defender = data.players[normalizedDefender];
@@ -555,6 +569,279 @@ app.post('/api/galaxy/invade', (req, res) => {
     message: victory 
       ? `Victory! You captured ${loot.iron} iron, ${loot.deuterium} deuterium, and ${loot.crystals} crystals!`
       : `Defeat! Your fleet was repelled. You lost ${attackerShipsLost} ships.`,
+  });
+});
+
+// ==================== ALLIANCE SYSTEM ====================
+
+/**
+ * Alliance data file path
+ */
+const ALLIANCES_FILE = path.join(__dirname, 'data', 'alliances.json');
+
+// Initialize alliances file if it doesn't exist
+if (!fs.existsSync(ALLIANCES_FILE)) {
+  fs.writeFileSync(ALLIANCES_FILE, JSON.stringify({ proposals: [], alliances: [] }, null, 2));
+}
+
+function loadAlliances() {
+  try {
+    const data = fs.readFileSync(ALLIANCES_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading alliances:', error);
+    return { proposals: [], alliances: [] };
+  }
+}
+
+function saveAlliances(data) {
+  try {
+    fs.writeFileSync(ALLIANCES_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error saving alliances:', error);
+  }
+}
+
+/**
+ * Send alliance proposal
+ */
+app.post('/api/alliance/propose', (req, res) => {
+  const { fromAddress, toAddress, allianceName, fromName } = req.body;
+  
+  if (!fromAddress || !toAddress || !allianceName) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  const normalizedFrom = fromAddress.toLowerCase();
+  const normalizedTo = toAddress.toLowerCase();
+  
+  // Can't ally with yourself
+  if (normalizedFrom === normalizedTo) {
+    return res.status(400).json({ error: 'Cannot ally with yourself' });
+  }
+  
+  const allianceData = loadAlliances();
+  
+  // Check if already allied
+  const existingAlliance = allianceData.alliances.find(a => 
+    (a.player1 === normalizedFrom && a.player2 === normalizedTo) ||
+    (a.player1 === normalizedTo && a.player2 === normalizedFrom)
+  );
+  
+  if (existingAlliance) {
+    return res.status(400).json({ error: 'Already allied with this player' });
+  }
+  
+  // Check if proposal already exists
+  const existingProposal = allianceData.proposals.find(p =>
+    p.fromAddress === normalizedFrom && p.toAddress === normalizedTo && p.status === 'pending'
+  );
+  
+  if (existingProposal) {
+    return res.status(400).json({ error: 'Proposal already pending' });
+  }
+  
+  // Get player name from players data
+  const playersData = loadData();
+  const fromPlayer = playersData.players[normalizedFrom];
+  const proposerName = fromName || fromPlayer?.playerName || 'Unknown Commander';
+  
+  const proposal = {
+    id: Date.now(),
+    fromAddress: normalizedFrom,
+    toAddress: normalizedTo,
+    fromName: proposerName,
+    allianceName: allianceName.trim(),
+    status: 'pending',
+    createdAt: Date.now(),
+  };
+  
+  allianceData.proposals.push(proposal);
+  saveAlliances(allianceData);
+  
+  console.log(`🤝 Alliance proposal from ${normalizedFrom} to ${normalizedTo}: "${allianceName}"`);
+  
+  res.json({ success: true, proposal });
+});
+
+/**
+ * Get proposals for a player
+ */
+app.get('/api/alliance/proposals/:address', (req, res) => {
+  const { address } = req.params;
+  const normalizedAddress = address.toLowerCase();
+  
+  const allianceData = loadAlliances();
+  
+  // Get incoming proposals (to me)
+  const incoming = allianceData.proposals.filter(p => 
+    p.toAddress === normalizedAddress && p.status === 'pending'
+  );
+  
+  // Get outgoing proposals (from me)
+  const outgoing = allianceData.proposals.filter(p =>
+    p.fromAddress === normalizedAddress && p.status === 'pending'
+  );
+  
+  res.json({ incoming, outgoing });
+});
+
+/**
+ * Accept alliance proposal
+ */
+app.post('/api/alliance/accept/:proposalId', (req, res) => {
+  const { proposalId } = req.params;
+  const { address } = req.body;
+  
+  const normalizedAddress = address?.toLowerCase();
+  const allianceData = loadAlliances();
+  
+  const proposal = allianceData.proposals.find(p => p.id === parseInt(proposalId));
+  
+  if (!proposal) {
+    return res.status(404).json({ error: 'Proposal not found' });
+  }
+  
+  if (proposal.toAddress !== normalizedAddress) {
+    return res.status(403).json({ error: 'Not authorized to accept this proposal' });
+  }
+  
+  if (proposal.status !== 'pending') {
+    return res.status(400).json({ error: 'Proposal already processed' });
+  }
+  
+  // Create the alliance
+  const alliance = {
+    id: Date.now(),
+    player1: proposal.fromAddress,
+    player2: proposal.toAddress,
+    name: proposal.allianceName,
+    createdAt: Date.now(),
+  };
+  
+  proposal.status = 'accepted';
+  allianceData.alliances.push(alliance);
+  saveAlliances(allianceData);
+  
+  console.log(`✅ Alliance formed: ${proposal.fromAddress} + ${proposal.toAddress} = "${proposal.allianceName}"`);
+  
+  res.json({ success: true, alliance });
+});
+
+/**
+ * Reject alliance proposal
+ */
+app.post('/api/alliance/reject/:proposalId', (req, res) => {
+  const { proposalId } = req.params;
+  const { address } = req.body;
+  
+  const normalizedAddress = address?.toLowerCase();
+  const allianceData = loadAlliances();
+  
+  const proposal = allianceData.proposals.find(p => p.id === parseInt(proposalId));
+  
+  if (!proposal) {
+    return res.status(404).json({ error: 'Proposal not found' });
+  }
+  
+  if (proposal.toAddress !== normalizedAddress) {
+    return res.status(403).json({ error: 'Not authorized to reject this proposal' });
+  }
+  
+  proposal.status = 'rejected';
+  saveAlliances(allianceData);
+  
+  console.log(`❌ Alliance proposal rejected: ${proposal.fromAddress} -> ${proposal.toAddress}`);
+  
+  res.json({ success: true });
+});
+
+/**
+ * Get active alliances for a player
+ */
+app.get('/api/alliance/active/:address', (req, res) => {
+  const { address } = req.params;
+  const normalizedAddress = address.toLowerCase();
+  
+  const allianceData = loadAlliances();
+  const playersData = loadData();
+  
+  // Find all alliances involving this player
+  const myAlliances = allianceData.alliances.filter(a =>
+    a.player1 === normalizedAddress || a.player2 === normalizedAddress
+  );
+  
+  // Enhance with player info
+  const enhancedAlliances = myAlliances.map(alliance => {
+    const allyAddress = alliance.player1 === normalizedAddress 
+      ? alliance.player2 
+      : alliance.player1;
+    const allyPlayer = playersData.players[allyAddress];
+    
+    return {
+      ...alliance,
+      allyAddress,
+      allyName: allyPlayer?.playerName || 'Unknown Commander',
+    };
+  });
+  
+  res.json({ alliances: enhancedAlliances });
+});
+
+/**
+ * End/dissolve an alliance
+ */
+app.post('/api/alliance/end/:allianceId', (req, res) => {
+  const { allianceId } = req.params;
+  const { address } = req.body;
+  
+  const normalizedAddress = address?.toLowerCase();
+  const allianceData = loadAlliances();
+  
+  const allianceIndex = allianceData.alliances.findIndex(a => a.id === parseInt(allianceId));
+  
+  if (allianceIndex === -1) {
+    return res.status(404).json({ error: 'Alliance not found' });
+  }
+  
+  const alliance = allianceData.alliances[allianceIndex];
+  
+  if (alliance.player1 !== normalizedAddress && alliance.player2 !== normalizedAddress) {
+    return res.status(403).json({ error: 'Not part of this alliance' });
+  }
+  
+  // Remove the alliance
+  allianceData.alliances.splice(allianceIndex, 1);
+  saveAlliances(allianceData);
+  
+  console.log(`💔 Alliance ended: ${alliance.player1} + ${alliance.player2}`);
+  
+  res.json({ success: true });
+});
+
+/**
+ * Check if two players are allied
+ */
+app.get('/api/alliance/check', (req, res) => {
+  const { player1, player2 } = req.query;
+  
+  if (!player1 || !player2) {
+    return res.status(400).json({ error: 'Missing player addresses' });
+  }
+  
+  const normalized1 = player1.toLowerCase();
+  const normalized2 = player2.toLowerCase();
+  
+  const allianceData = loadAlliances();
+  
+  const alliance = allianceData.alliances.find(a =>
+    (a.player1 === normalized1 && a.player2 === normalized2) ||
+    (a.player1 === normalized2 && a.player2 === normalized1)
+  );
+  
+  res.json({ 
+    isAllied: !!alliance,
+    alliance: alliance || null
   });
 });
 

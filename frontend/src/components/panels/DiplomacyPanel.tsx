@@ -3,21 +3,26 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useState, useEffect, useCallback } from 'react';
-import { getGalaxyPlayers, executeInvasion, GalaxyPlayer } from '@/lib/leaderboardApi';
+import { 
+  getGalaxyPlayers, 
+  executeInvasion, 
+  GalaxyPlayer,
+  proposeAlliance,
+  getAllianceProposals,
+  acceptAllianceProposal,
+  rejectAllianceProposal,
+  getActiveAlliances,
+  endAlliance,
+  checkAlliance,
+  AllianceProposal,
+  Alliance
+} from '@/lib/leaderboardApi';
 import { lineraAdapter } from '@/lib/linera';
 import { useLinera } from '@/lib/linera/LineraProvider';
 import { LAUNCH_INVASION } from '@/lib/linera/queries';
 
-interface AllianceProposal {
-  id: number;
-  fromAddress: string;
-  fromName: string;
-  allianceName: string;
-  createdAt: number;
-}
-
 export function DiplomacyPanel() {
-  const { web3Address, fleets, addResources } = useGameStore();
+  const { web3Address, fleets, addResources, playerName } = useGameStore();
   const [tab, setTab] = useState<'relations' | 'proposals' | 'wars'>('relations');
   const [galaxyPlayers, setGalaxyPlayers] = useState<GalaxyPlayer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,8 +32,10 @@ export function DiplomacyPanel() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionResult, setActionResult] = useState<{ success: boolean; message: string } | null>(null);
   
-  // Mock proposals (in production, fetch from contract)
-  const [proposals] = useState<AllianceProposal[]>([]);
+  // Alliance state
+  const [proposals, setProposals] = useState<{ incoming: AllianceProposal[]; outgoing: AllianceProposal[] }>({ incoming: [], outgoing: [] });
+  const [alliances, setAlliances] = useState<Alliance[]>([]);
+  const [alliedAddresses, setAlliedAddresses] = useState<Set<string>>(new Set());
   
   // Calculate my total ships
   const myTotalShips = fleets.reduce((sum, fleet) => 
@@ -49,36 +56,156 @@ export function DiplomacyPanel() {
     setLoading(false);
   }, [web3Address]);
 
+  // Fetch proposals
+  const fetchProposals = useCallback(async () => {
+    if (!web3Address) return;
+    try {
+      const result = await getAllianceProposals(web3Address);
+      if (result) {
+        setProposals(result);
+      }
+    } catch (e) {
+      console.warn('Could not fetch proposals');
+    }
+  }, [web3Address]);
+
+  // Fetch active alliances
+  const fetchAlliances = useCallback(async () => {
+    if (!web3Address) return;
+    try {
+      const result = await getActiveAlliances(web3Address);
+      if (result) {
+        setAlliances(result);
+        // Create set of allied addresses for quick lookup
+        const allies = new Set<string>();
+        result.forEach(a => {
+          if (a.allyAddress) allies.add(a.allyAddress.toLowerCase());
+        });
+        setAlliedAddresses(allies);
+      }
+    } catch (e) {
+      console.warn('Could not fetch alliances');
+    }
+  }, [web3Address]);
+
   useEffect(() => {
     fetchPlayers();
-  }, [fetchPlayers]);
+    fetchProposals();
+    fetchAlliances();
+  }, [fetchPlayers, fetchProposals, fetchAlliances]);
 
-  // Handle propose alliance (contract call)
+  // Check if player is an ally
+  const isAlly = (playerAddress: string) => {
+    return alliedAddresses.has(playerAddress.toLowerCase());
+  };
+
+  // Handle propose alliance
   const handleProposeAlliance = async () => {
-    if (!selectedPlayer || !allianceName.trim()) return;
+    if (!selectedPlayer || !allianceName.trim() || !web3Address) return;
     
-    // Need a valid Linera chainId for cross-chain operations
-    if (!selectedPlayer.chainId) {
-      setActionResult({ success: false, message: `${selectedPlayer.playerName} doesn't have a Linera chain ID yet. They need to connect their wallet first.` });
+    setActionLoading(true);
+    try {
+      // First try on-chain if we have a chainId
+      if (selectedPlayer.chainId) {
+        try {
+          const mutation = `
+            mutation ProposeAlliance($targetChain: String!, $allianceName: String!) {
+              proposeAlliance(targetChain: $targetChain, allianceName: $allianceName)
+            }
+          `;
+          
+          await lineraAdapter.mutate(mutation, {
+            targetChain: selectedPlayer.chainId,
+            allianceName: allianceName.trim(),
+          });
+          console.log('✅ On-chain alliance proposal sent');
+        } catch (e) {
+          console.warn('⚠️ On-chain proposal failed, using backend:', e);
+        }
+      }
+      
+      // Also store in backend for UI
+      const result = await proposeAlliance(
+        web3Address, 
+        selectedPlayer.address, 
+        allianceName.trim(),
+        playerName
+      );
+      
+      if (result.success) {
+        setActionResult({ success: true, message: `Alliance proposal sent to ${selectedPlayer.playerName}!` });
+        fetchProposals();
+      } else {
+        setActionResult({ success: false, message: result.error || 'Failed to send proposal' });
+      }
+    } catch (e) {
+      setActionResult({ success: false, message: `Failed to send proposal: ${e}` });
+    }
+    setActionLoading(false);
+    setAllianceName('');
+  };
+
+  // Handle accept proposal
+  const handleAcceptProposal = async (proposal: AllianceProposal) => {
+    if (!web3Address) return;
+    
+    setActionLoading(true);
+    try {
+      const result = await acceptAllianceProposal(proposal.id, web3Address);
+      
+      if (result.success) {
+        setActionResult({ success: true, message: `Alliance "${proposal.allianceName}" formed with ${proposal.fromName}!` });
+        fetchProposals();
+        fetchAlliances();
+      } else {
+        setActionResult({ success: false, message: result.error || 'Failed to accept proposal' });
+      }
+    } catch (e) {
+      setActionResult({ success: false, message: `Failed to accept: ${e}` });
+    }
+    setActionLoading(false);
+  };
+
+  // Handle reject proposal
+  const handleRejectProposal = async (proposal: AllianceProposal) => {
+    if (!web3Address) return;
+    
+    setActionLoading(true);
+    try {
+      const result = await rejectAllianceProposal(proposal.id, web3Address);
+      
+      if (result.success) {
+        setActionResult({ success: true, message: 'Proposal rejected' });
+        fetchProposals();
+      } else {
+        setActionResult({ success: false, message: result.error || 'Failed to reject proposal' });
+      }
+    } catch (e) {
+      setActionResult({ success: false, message: `Failed to reject: ${e}` });
+    }
+    setActionLoading(false);
+  };
+
+  // Handle end alliance
+  const handleEndAlliance = async (alliance: Alliance) => {
+    if (!web3Address) return;
+    
+    if (!confirm(`Are you sure you want to end the alliance "${alliance.name}" with ${alliance.allyName}?`)) {
       return;
     }
     
     setActionLoading(true);
     try {
-      const mutation = `
-        mutation ProposeAlliance($targetChain: String!, $allianceName: String!) {
-          proposeAlliance(targetChain: $targetChain, allianceName: $allianceName)
-        }
-      `;
+      const result = await endAlliance(alliance.id, web3Address);
       
-      await lineraAdapter.mutate(mutation, {
-        targetChain: selectedPlayer.chainId,
-        allianceName: allianceName.trim(),
-      });
-      
-      setActionResult({ success: true, message: `Alliance proposal sent to ${selectedPlayer.playerName}!` });
+      if (result.success) {
+        setActionResult({ success: true, message: `Alliance "${alliance.name}" has been dissolved.` });
+        fetchAlliances();
+      } else {
+        setActionResult({ success: false, message: result.error || 'Failed to end alliance' });
+      }
     } catch (e) {
-      setActionResult({ success: false, message: `Failed to send proposal: ${e}` });
+      setActionResult({ success: false, message: `Failed to end alliance: ${e}` });
     }
     setActionLoading(false);
   };
@@ -86,6 +213,12 @@ export function DiplomacyPanel() {
   // Handle declare war (contract call)
   const handleDeclareWar = async () => {
     if (!selectedPlayer) return;
+    
+    // Check if allied - can't declare war on ally
+    if (isAlly(selectedPlayer.address)) {
+      setActionResult({ success: false, message: `Cannot declare war on an ally! End the alliance first.` });
+      return;
+    }
     
     // Need a valid Linera chainId for cross-chain operations
     if (!selectedPlayer.chainId) {
@@ -118,6 +251,12 @@ export function DiplomacyPanel() {
   // Handle launch invasion - uses Linera contract + backend simulation
   const handleLaunchInvasion = async () => {
     if (!selectedPlayer || !web3Address) return;
+    
+    // Check if allied - can't invade ally
+    if (isAlly(selectedPlayer.address)) {
+      setActionResult({ success: false, message: `Cannot invade an ally! End the alliance first.` });
+      return;
+    }
     
     setActionLoading(true);
     try {
@@ -185,7 +324,7 @@ export function DiplomacyPanel() {
 
   const tabs = [
     { id: 'relations', label: 'Relations', icon: '🤝' },
-    { id: 'proposals', label: 'Proposals', icon: '📜', badge: proposals.length },
+    { id: 'proposals', label: 'Proposals', icon: '📜', badge: proposals.incoming.length },
     { id: 'wars', label: 'Active Wars', icon: '⚔️' },
   ];
 
@@ -260,6 +399,7 @@ export function DiplomacyPanel() {
               <div className="grid gap-4 md:grid-cols-2">
                 {galaxyPlayers.map((player, i) => {
                   const threatLevel = player.powerLevel < 5 ? 'weak' : player.powerLevel < 15 ? 'medium' : 'strong';
+                  const playerIsAlly = isAlly(player.address);
                   
                   return (
                     <motion.div
@@ -267,55 +407,86 @@ export function DiplomacyPanel() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="rounded-xl border border-gray-700 bg-void/50 p-4 hover:border-nebula-500/50 transition-all cursor-pointer"
+                      className={`rounded-xl border p-4 transition-all cursor-pointer ${
+                        playerIsAlly 
+                          ? 'border-green-500/50 bg-green-500/10 hover:border-green-500'
+                          : 'border-gray-700 bg-void/50 hover:border-nebula-500/50'
+                      }`}
                       onClick={() => setSelectedPlayer(player)}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                            playerIsAlly ? 'bg-green-500/20' :
                             threatLevel === 'weak' ? 'bg-green-500/20' :
                             threatLevel === 'medium' ? 'bg-yellow-500/20' : 'bg-red-500/20'
                           }`}>
-                            <span className="text-2xl">👤</span>
+                            <span className="text-2xl">{playerIsAlly ? '🤝' : '👤'}</span>
                           </div>
                           <div>
-                            <h3 className="font-display font-bold text-white">{player.playerName}</h3>
+                            <h3 className="font-display font-bold text-white flex items-center gap-2">
+                              {player.playerName}
+                              {playerIsAlly && (
+                                <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400">ALLY</span>
+                              )}
+                            </h3>
                             <p className="text-xs text-gray-400">
                               ⚡{player.powerLevel} Power | 🚀{player.totalShips} Ships
                             </p>
                           </div>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                          threatLevel === 'weak' ? 'bg-green-500/20 text-green-400' :
-                          threatLevel === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                          'bg-red-500/20 text-red-400'
-                        }`}>
-                          {threatLevel}
-                        </span>
+                        {!playerIsAlly && (
+                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                            threatLevel === 'weak' ? 'bg-green-500/20 text-green-400' :
+                            threatLevel === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {threatLevel}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex gap-2">
-                        <motion.button
-                          className="flex-1 py-1.5 rounded-lg bg-energy-500/20 text-energy-400 text-xs font-bold hover:bg-energy-500/30"
-                          onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('alliance'); }}
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          🤝 Ally
-                        </motion.button>
-                        <motion.button
-                          className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30"
-                          onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('war'); }}
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          ⚔️ War
-                        </motion.button>
-                        <motion.button
-                          className="flex-1 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/30"
-                          onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('invasion'); }}
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          🚀 Invade
-                        </motion.button>
+                        {playerIsAlly ? (
+                          <>
+                            <motion.button
+                              className="flex-1 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-xs font-bold cursor-default"
+                              whileHover={{ scale: 1 }}
+                            >
+                              ✅ Allied
+                            </motion.button>
+                            <motion.button
+                              className="flex-1 py-1.5 rounded-lg bg-gray-500/20 text-gray-500 text-xs font-bold cursor-not-allowed"
+                              title="Cannot invade an ally"
+                            >
+                              🚫 Protected
+                            </motion.button>
+                          </>
+                        ) : (
+                          <>
+                            <motion.button
+                              className="flex-1 py-1.5 rounded-lg bg-energy-500/20 text-energy-400 text-xs font-bold hover:bg-energy-500/30"
+                              onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('alliance'); }}
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              🤝 Ally
+                            </motion.button>
+                            <motion.button
+                              className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30"
+                              onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('war'); }}
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              ⚔️ War
+                            </motion.button>
+                            <motion.button
+                              className="flex-1 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 text-xs font-bold hover:bg-orange-500/30"
+                              onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); setActionModal('invasion'); }}
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              🚀 Invade
+                            </motion.button>
+                          </>
+                        )}
                       </div>
                     </motion.div>
                   );
@@ -326,47 +497,137 @@ export function DiplomacyPanel() {
         )}
 
         {tab === 'proposals' && (
-          <div className="space-y-4">
-            {proposals.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">
-                <span className="text-4xl">📭</span>
-                <p className="mt-2">No pending proposals</p>
-              </div>
-            ) : (
-              proposals.map((proposal, i) => (
-                <motion.div
-                  key={proposal.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="rounded-xl border border-energy-500/30 bg-energy-500/10 p-4"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="font-display font-bold text-white">{proposal.allianceName}</h3>
-                      <p className="text-sm text-gray-400">From: {proposal.fromName}</p>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {Math.floor((Date.now() - proposal.createdAt) / 60000)}m ago
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <motion.button
-                      className="flex-1 py-2 rounded-lg bg-energy-500 text-white font-bold hover:bg-energy-400"
-                      whileHover={{ scale: 1.02 }}
+          <div className="space-y-6">
+            {/* Incoming Proposals */}
+            <div>
+              <h3 className="font-display text-lg font-bold text-white mb-3">
+                📥 Incoming Proposals ({proposals.incoming.length})
+              </h3>
+              {proposals.incoming.length === 0 ? (
+                <div className="text-center text-gray-400 py-4 border border-gray-700 rounded-lg bg-void/30">
+                  <span className="text-2xl">📭</span>
+                  <p className="mt-1 text-sm">No incoming proposals</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {proposals.incoming.map((proposal, i) => (
+                    <motion.div
+                      key={proposal.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="rounded-xl border border-energy-500/30 bg-energy-500/10 p-4"
                     >
-                      ✅ Accept
-                    </motion.button>
-                    <motion.button
-                      className="flex-1 py-2 rounded-lg border border-gray-600 text-gray-400 font-bold hover:bg-gray-800"
-                      whileHover={{ scale: 1.02 }}
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h3 className="font-display font-bold text-white">{proposal.allianceName}</h3>
+                          <p className="text-sm text-gray-400">From: {proposal.fromName}</p>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {Math.floor((Date.now() - proposal.createdAt) / 60000)}m ago
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <motion.button
+                          className="flex-1 py-2 rounded-lg bg-energy-500 text-white font-bold hover:bg-energy-400 disabled:opacity-50"
+                          onClick={() => handleAcceptProposal(proposal)}
+                          disabled={actionLoading}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          ✅ Accept
+                        </motion.button>
+                        <motion.button
+                          className="flex-1 py-2 rounded-lg border border-gray-600 text-gray-400 font-bold hover:bg-gray-800 disabled:opacity-50"
+                          onClick={() => handleRejectProposal(proposal)}
+                          disabled={actionLoading}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          ❌ Reject
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Outgoing Proposals */}
+            <div>
+              <h3 className="font-display text-lg font-bold text-white mb-3">
+                📤 Sent Proposals ({proposals.outgoing.length})
+              </h3>
+              {proposals.outgoing.length === 0 ? (
+                <div className="text-center text-gray-400 py-4 border border-gray-700 rounded-lg bg-void/30">
+                  <span className="text-2xl">📬</span>
+                  <p className="mt-1 text-sm">No pending outgoing proposals</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {proposals.outgoing.map((proposal, i) => (
+                    <motion.div
+                      key={proposal.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="rounded-xl border border-nebula-500/30 bg-nebula-500/10 p-4"
                     >
-                      ❌ Reject
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ))
-            )}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-display font-bold text-white">{proposal.allianceName}</h3>
+                          <p className="text-sm text-gray-400">To: {proposal.toAddress?.slice(0, 8)}...</p>
+                        </div>
+                        <span className="px-2 py-1 rounded text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                          Pending
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Active Alliances */}
+            <div>
+              <h3 className="font-display text-lg font-bold text-white mb-3">
+                🤝 Active Alliances ({alliances.length})
+              </h3>
+              {alliances.length === 0 ? (
+                <div className="text-center text-gray-400 py-4 border border-gray-700 rounded-lg bg-void/30">
+                  <span className="text-2xl">🌐</span>
+                  <p className="mt-1 text-sm">No active alliances</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {alliances.map((alliance, i) => (
+                    <motion.div
+                      key={alliance.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="rounded-xl border border-green-500/30 bg-green-500/10 p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-display font-bold text-white flex items-center gap-2">
+                            <span className="text-green-400">🤝</span>
+                            {alliance.name}
+                          </h3>
+                          <p className="text-sm text-gray-400">Ally: {alliance.allyName}</p>
+                        </div>
+                        <motion.button
+                          className="px-3 py-1 rounded-lg border border-red-500/50 text-red-400 text-xs font-bold hover:bg-red-500/20 disabled:opacity-50"
+                          onClick={() => handleEndAlliance(alliance)}
+                          disabled={actionLoading}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          💔 End Alliance
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

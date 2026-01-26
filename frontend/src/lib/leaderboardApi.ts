@@ -301,3 +301,186 @@ export async function executeInvasion(
     return null;
   }
 }
+
+// ==================== ALLIANCE API ====================
+
+export interface AllianceProposal {
+  id: number;
+  fromAddress: string;
+  toAddress: string;
+  fromName: string;
+  allianceName: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: number;
+}
+
+export interface Alliance {
+  id: number;
+  player1: string;
+  player2: string;
+  name: string;
+  allyAddress?: string;
+  allyName?: string;
+  createdAt: number;
+}
+
+/**
+ * Send alliance proposal to another player
+ */
+export async function proposeAlliance(
+  fromAddress: string, 
+  toAddress: string, 
+  allianceName: string,
+  fromName?: string
+): Promise<{ success: boolean; proposal?: AllianceProposal; error?: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/propose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromAddress, toAddress, allianceName, fromName }),
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: result.error };
+    }
+    
+    return { success: true, proposal: result.proposal };
+  } catch (error) {
+    console.error('❌ Failed to send proposal:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+/**
+ * Get alliance proposals for a player
+ */
+export async function getAllianceProposals(address: string): Promise<{
+  incoming: AllianceProposal[];
+  outgoing: AllianceProposal[];
+} | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/proposals/${address}`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error('❌ Failed to fetch proposals:', error);
+    return null;
+  }
+}
+
+/**
+ * Accept alliance proposal
+ */
+export async function acceptAllianceProposal(
+  proposalId: number, 
+  address: string
+): Promise<{ success: boolean; alliance?: Alliance; error?: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/accept/${proposalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: result.error };
+    }
+    
+    return { success: true, alliance: result.alliance };
+  } catch (error) {
+    console.error('❌ Failed to accept proposal:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+/**
+ * Reject alliance proposal
+ */
+export async function rejectAllianceProposal(
+  proposalId: number, 
+  address: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/reject/${proposalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: result.error };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to reject proposal:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+/**
+ * Get active alliances for a player
+ */
+export async function getActiveAlliances(address: string): Promise<Alliance[] | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/active/${address}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.alliances;
+  } catch (error) {
+    console.error('❌ Failed to fetch alliances:', error);
+    return null;
+  }
+}
+
+/**
+ * End/dissolve an alliance
+ */
+export async function endAlliance(
+  allianceId: number, 
+  address: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/alliance/end/${allianceId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: result.error };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to end alliance:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+/**
+ * Check if two players are allied
+ */
+export async function checkAlliance(
+  player1: string, 
+  player2: string
+): Promise<{ isAllied: boolean; alliance?: Alliance }> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/alliance/check?player1=${player1}&player2=${player2}`
+    );
+    if (!response.ok) return { isAllied: false };
+    return await response.json();
+  } catch (error) {
+    console.error('❌ Failed to check alliance:', error);
+    return { isAllied: false };
+  }
+}
