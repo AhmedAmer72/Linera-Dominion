@@ -838,25 +838,20 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
     
     setInvading(true);
     try {
-      // First, try to call the Linera contract if connected
-      // Use isConnected as mutate will auto-connect to app if needed
-      if (isConnected && mutate) {
+      // First, try to call the Linera contract if connected AND target has chainId
+      if (isConnected && mutate && player.chainId) {
         try {
           // Find the first available fleet for the invasion
           const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
           const fleetId = attackFleet?.id ?? 1;
           
           console.log('🚀 Launching invasion via Linera contract...');
-          console.log('📍 Target chain:', player.chainId || player.address);
+          console.log('📍 Target chain:', player.chainId);
           console.log('🎯 Target coords:', player.homeX, player.homeY);
           console.log('🔗 Wallet connected:', isConnected, 'App connected:', isAppConnected);
           
-          // Call the smart contract's launchInvasion mutation
-          // Note: targetChain should be the player's chainId if available
-          const targetChain = player.chainId || player.address;
-          
           await mutate(LAUNCH_INVASION, {
-            targetChain: targetChain,
+            targetChain: player.chainId,
             fleetId: fleetId,
             targetX: player.homeX || 0,
             targetY: player.homeY || 0,
@@ -867,7 +862,11 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
           console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
         }
       } else {
-        console.log('⚠️ Not connected to Linera, using mock invasion');
+        if (!player.chainId) {
+          console.log('⚠️ Target player has no Linera chainId, using mock invasion');
+        } else {
+          console.log('⚠️ Not connected to Linera, using mock invasion');
+        }
       }
       
       // Execute battle simulation (backend mock for now)

@@ -57,6 +57,12 @@ export function DiplomacyPanel() {
   const handleProposeAlliance = async () => {
     if (!selectedPlayer || !allianceName.trim()) return;
     
+    // Need a valid Linera chainId for cross-chain operations
+    if (!selectedPlayer.chainId) {
+      setActionResult({ success: false, message: `${selectedPlayer.playerName} doesn't have a Linera chain ID yet. They need to connect their wallet first.` });
+      return;
+    }
+    
     setActionLoading(true);
     try {
       const mutation = `
@@ -66,7 +72,7 @@ export function DiplomacyPanel() {
       `;
       
       await lineraAdapter.mutate(mutation, {
-        targetChain: selectedPlayer.address,
+        targetChain: selectedPlayer.chainId,
         allianceName: allianceName.trim(),
       });
       
@@ -81,6 +87,12 @@ export function DiplomacyPanel() {
   const handleDeclareWar = async () => {
     if (!selectedPlayer) return;
     
+    // Need a valid Linera chainId for cross-chain operations
+    if (!selectedPlayer.chainId) {
+      setActionResult({ success: false, message: `${selectedPlayer.playerName} doesn't have a Linera chain ID yet.` });
+      return;
+    }
+    
     setActionLoading(true);
     try {
       const mutation = `
@@ -90,7 +102,7 @@ export function DiplomacyPanel() {
       `;
       
       await lineraAdapter.mutate(mutation, {
-        targetChain: selectedPlayer.address,
+        targetChain: selectedPlayer.chainId,
       });
       
       setActionResult({ success: true, message: `War declared on ${selectedPlayer.playerName}!` });
@@ -109,18 +121,18 @@ export function DiplomacyPanel() {
     
     setActionLoading(true);
     try {
-      // First, call Linera contract if connected
-      if (isConnected && mutate) {
+      // First, call Linera contract if connected AND target has chainId
+      if (isConnected && mutate && selectedPlayer.chainId) {
         try {
           const attackFleet = fleets.find(f => f.ships.some(s => s.quantity > 0));
           const fleetId = attackFleet?.id ?? 1;
           
           console.log('🚀 Launching invasion via Linera contract...');
           console.log('🔗 Wallet connected:', isConnected, 'App connected:', isAppConnected);
-          const targetChain = selectedPlayer.chainId || selectedPlayer.address;
+          console.log('🎯 Target chain:', selectedPlayer.chainId);
           
           await mutate(LAUNCH_INVASION, {
-            targetChain: targetChain,
+            targetChain: selectedPlayer.chainId,
             fleetId: fleetId,
             targetX: selectedPlayer.homeX || 0,
             targetY: selectedPlayer.homeY || 0,
@@ -131,7 +143,11 @@ export function DiplomacyPanel() {
           console.warn('⚠️ Linera contract call failed, falling back to mock:', lineraError);
         }
       } else {
-        console.log('⚠️ Not connected to Linera, using mock invasion');
+        if (!selectedPlayer.chainId) {
+          console.log('⚠️ Target player has no Linera chainId, using mock invasion');
+        } else {
+          console.log('⚠️ Not connected to Linera, using mock invasion');
+        }
       }
       
       // Execute battle simulation via backend
