@@ -82,8 +82,9 @@ export function formatOfflineTime(seconds: number): string {
 
 /**
  * Save game state to localStorage and sync to backend
+ * @param chainId - Optional Linera chain ID for cross-chain operations
  */
-export function saveGameState(web3Address: string, state: Partial<PersistedGameState>): void {
+export function saveGameState(web3Address: string, state: Partial<PersistedGameState>, chainId?: string): void {
   if (!web3Address || typeof window === 'undefined') return;
 
   try {
@@ -108,6 +109,7 @@ export function saveGameState(web3Address: string, state: Partial<PersistedGameS
     // Also sync to backend for leaderboard (async, don't wait)
     syncPlayerData(web3Address, {
       address: web3Address,
+      chainId: chainId, // Include chain ID for galaxy map cross-chain operations
       playerName: toSave.playerName,
       homeX: toSave.homeX,
       homeY: toSave.homeY,

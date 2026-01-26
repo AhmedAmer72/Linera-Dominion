@@ -443,7 +443,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           buildings: persisted.buildings,
           fleets: persisted.fleets,
           research: persisted.research,
-        });
+        }, state.chainId || undefined);
         
         // Try to sync with blockchain, but DON'T overwrite local resources with 0 values
         try {
@@ -536,7 +536,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           homeX: newState.homeX,
           homeY: newState.homeY,
           resources: newState.resources,
-        });
+        }, state.chainId || undefined);
       }
     } catch (error) {
       console.error('❌ Failed to fetch game state:', error);
@@ -563,7 +563,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           homeX: defaultState.homeX,
           homeY: defaultState.homeY,
           resources: defaultState.resources,
-        });
+        }, state.chainId || undefined);
       }
     }
   },
@@ -602,7 +602,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       buildings: state.buildings,
       fleets: state.fleets,
       research: state.research,
-    });
+    }, state.chainId || undefined);
   },
   
   // Tick resources based on production rates (called every second)
@@ -634,7 +634,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Auto-save on resource change
     const state = get();
     if (state.web3Address) {
-      saveGameState(state.web3Address, { resources });
+      saveGameState(state.web3Address, { resources }, state.chainId || undefined);
     }
   },
   
@@ -790,7 +790,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           resources: state.resources,
           resourceRates: state.resourceRates,
           buildings: state.buildings,
-        });
+        }, state.chainId || undefined);
       }
     } catch (error) {
       console.error('❌ Build failed:', error);
@@ -923,7 +923,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         saveGameState(state.web3Address, {
           resources: state.resources,
           fleets: state.fleets,
-        });
+        }, state.chainId || undefined);
       }
     } catch (error) {
       console.error('❌ Ship build failed:', error);
@@ -1014,7 +1014,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (state.web3Address) {
         saveGameState(state.web3Address, {
           research: state.research,
-        });
+        }, state.chainId || undefined);
       }
     } catch (error) {
       console.error('❌ Research failed:', error);

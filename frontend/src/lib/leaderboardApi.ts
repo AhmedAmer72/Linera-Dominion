@@ -8,6 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export interface PlayerData {
   address: string;
+  chainId?: string;  // Linera chain ID for cross-chain operations
   playerName: string;
   homeX: number;
   homeY: number;

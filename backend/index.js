@@ -148,6 +148,53 @@ app.get('/api/player/:address', (req, res) => {
 });
 
 /**
+ * Generate unique home coordinates that don't overlap with existing players
+ * Uses a spiral pattern from center with minimum spacing
+ */
+function generateUniqueHomeCoords(data) {
+  const existingCoords = new Set();
+  const MIN_DISTANCE = 15; // Minimum distance between home bases
+  
+  // Collect all existing home coordinates
+  Object.values(data.players).forEach(player => {
+    if (player.homeX !== undefined && player.homeY !== undefined) {
+      existingCoords.add(`${player.homeX},${player.homeY}`);
+    }
+  });
+  
+  // Check if coordinates are far enough from all existing bases
+  const isFarEnough = (x, y) => {
+    for (const player of Object.values(data.players)) {
+      if (player.homeX !== undefined && player.homeY !== undefined) {
+        const dist = Math.sqrt(Math.pow(x - player.homeX, 2) + Math.pow(y - player.homeY, 2));
+        if (dist < MIN_DISTANCE) return false;
+      }
+    }
+    return true;
+  };
+  
+  // Try random positions in increasingly larger circles
+  for (let radius = 20; radius < 500; radius += 10) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const angle = Math.random() * 2 * Math.PI;
+      const r = radius * (0.5 + Math.random() * 0.5);
+      const x = Math.round(Math.cos(angle) * r);
+      const y = Math.round(Math.sin(angle) * r);
+      
+      if (!existingCoords.has(`${x},${y}`) && isFarEnough(x, y)) {
+        return { homeX: x, homeY: y };
+      }
+    }
+  }
+  
+  // Fallback: random position far from center
+  return { 
+    homeX: Math.floor(Math.random() * 400) - 200, 
+    homeY: Math.floor(Math.random() * 400) - 200 
+  };
+}
+
+/**
  * Save/Update player data
  */
 app.post('/api/player/:address', (req, res) => {
@@ -159,9 +206,24 @@ app.post('/api/player/:address', (req, res) => {
   
   // Merge with existing data or create new
   const existing = data.players[normalizedAddress] || {};
+  
+  // If this is a new player or they don't have home coordinates, generate unique ones
+  let homeCoords = {};
+  if (existing.homeX === undefined || existing.homeY === undefined) {
+    if (playerData.homeX !== undefined && playerData.homeY !== undefined) {
+      // Use provided coordinates if available
+      homeCoords = { homeX: playerData.homeX, homeY: playerData.homeY };
+    } else {
+      // Generate unique coordinates
+      homeCoords = generateUniqueHomeCoords(data);
+      console.log(`🌟 New player ${normalizedAddress} assigned home at (${homeCoords.homeX}, ${homeCoords.homeY})`);
+    }
+  }
+  
   data.players[normalizedAddress] = {
     ...existing,
     ...playerData,
+    ...homeCoords, // Apply home coordinates (will be empty if player already has them)
     address: normalizedAddress,
     lastUpdated: Date.now(),
   };
@@ -287,6 +349,7 @@ app.get('/api/galaxy/players', (req, res) => {
   // Convert players to galaxy map format
   const galaxyPlayers = Object.values(data.players)
     .filter(player => player.address !== normalizedExclude) // Exclude current player
+    .filter(player => player.homeX !== undefined && player.homeY !== undefined) // Only show players with home coords
     .map(player => {
       const score = calculateScore(player);
       const totalShips = (player.fleets || []).reduce((sum, f) => 
@@ -298,9 +361,10 @@ app.get('/api/galaxy/players', (req, res) => {
       
       return {
         address: player.address,
+        chainId: player.chainId, // Include Linera chain ID for cross-chain operations
         playerName: player.playerName || 'Unknown Commander',
-        homeX: player.homeX || Math.floor(Math.random() * 20) - 10,
-        homeY: player.homeY || Math.floor(Math.random() * 20) - 10,
+        homeX: player.homeX,
+        homeY: player.homeY,
         score,
         powerLevel,
         totalShips,
