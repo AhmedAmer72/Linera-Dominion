@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { useGameStore } from '@/store/gameStore';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { getGalaxyPlayers, getInvasionInfo, executeInvasion, GalaxyPlayer, InvasionInfo, InvasionResult } from '@/lib/leaderboardApi';
+import { getGalaxyPlayers, getInvasionInfo, executeInvasion, GalaxyPlayer, InvasionInfo, InvasionResult, checkAlliance, getActiveAlliances } from '@/lib/leaderboardApi';
 import { useLinera } from '@/lib/linera/LineraProvider';
 import { LAUNCH_INVASION } from '@/lib/linera/queries';
 
@@ -40,6 +40,7 @@ export function GalaxyPanel() {
   // Multiplayer state
   const [galaxyPlayers, setGalaxyPlayers] = useState<GalaxyPlayer[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [allyAddresses, setAllyAddresses] = useState<Set<string>>(new Set());
   
   // Fetch galaxy players on mount and periodically
   const fetchGalaxyPlayers = useCallback(async () => {
@@ -51,6 +52,15 @@ export function GalaxyPanel() {
       if (result) {
         setGalaxyPlayers(result.players);
       }
+      
+      // Fetch active alliances to mark allies
+      const alliances = await getActiveAlliances(web3Address);
+      const allies = new Set<string>();
+      alliances.forEach(a => {
+        const otherPlayer = a.player1.toLowerCase() === web3Address.toLowerCase() ? a.player2 : a.player1;
+        allies.add(otherPlayer.toLowerCase());
+      });
+      setAllyAddresses(allies);
     } catch (e) {
       console.warn('Could not fetch galaxy players');
     }
@@ -372,9 +382,13 @@ export function GalaxyPanel() {
           const playerX = 50 + ((player.homeX - homeX) * 5 + offset.x) * zoom;
           const playerY = 50 + ((player.homeY - homeY) * 5 + offset.y) * zoom;
           
-          // Determine player threat level by power
-          const threatLevel = player.powerLevel < 5 ? 'weak' : player.powerLevel < 15 ? 'medium' : 'strong';
-          const threatColors = {
+          // Check if this player is an ally
+          const isPlayerAlly = allyAddresses.has(player.address.toLowerCase());
+          
+          // Determine player threat level by power (or ally status)
+          const threatLevel = isPlayerAlly ? 'ally' : player.powerLevel < 5 ? 'weak' : player.powerLevel < 15 ? 'medium' : 'strong';
+          const threatColors: Record<string, string> = {
+            ally: '#22c55e', // bright green for allies
             weak: '#4ade80', // green
             medium: '#fbbf24', // yellow
             strong: '#f87171', // red
@@ -426,12 +440,22 @@ export function GalaxyPanel() {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
               >
-                {/* Player icon */}
-                <span style={{ fontSize: 10 * zoom }}>👤</span>
+                {/* Player icon - handshake for allies */}
+                <span style={{ fontSize: 10 * zoom }}>{isPlayerAlly ? '🤝' : '👤'}</span>
               </motion.div>
               
+              {/* Ally indicator */}
+              {isPlayerAlly && (
+                <motion.div
+                  className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-green-500"
+                  style={{ width: 10 * zoom, height: 10 * zoom }}
+                  animate={{ scale: [1, 1.2, 1], opacity: [1, 0.8, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+              )}
+              
               {/* Online indicator */}
-              {Date.now() - player.lastUpdated < 5 * 60 * 1000 && (
+              {!isPlayerAlly && Date.now() - player.lastUpdated < 5 * 60 * 1000 && (
                 <motion.div
                   className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-400"
                   style={{ width: 8 * zoom, height: 8 * zoom }}
@@ -446,13 +470,13 @@ export function GalaxyPanel() {
                 style={{ top: 28 * zoom }}
               >
                 <p className="font-display text-xs font-bold" style={{ fontSize: 9 * zoom, color: threatColors[threatLevel] }}>
-                  {player.playerName.slice(0, 12)}
+                  {isPlayerAlly ? '🤝 ' : ''}{player.playerName.slice(0, 12)}
                 </p>
                 <span 
                   className="inline-block mt-0.5 px-1 py-0.5 rounded bg-void/80 text-gray-400"
                   style={{ fontSize: 7 * zoom }}
                 >
-                  ⚡{player.powerLevel} | 🚀{player.totalShips}
+                  {isPlayerAlly ? 'ALLY' : `⚡${player.powerLevel} | 🚀${player.totalShips}`}
                 </span>
               </div>
             </motion.div>
@@ -816,17 +840,27 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
   const [loading, setLoading] = useState(true);
   const [invading, setInvading] = useState(false);
   const [battleResult, setBattleResult] = useState<InvasionResult | null>(null);
+  const [isAlly, setIsAlly] = useState(false);
   
   // Calculate my total ships
   const myTotalShips = fleets.reduce((sum, fleet) => 
     sum + fleet.ships.reduce((s, ship) => s + ship.quantity, 0), 0);
   
-  // Fetch invasion info on mount
+  // Fetch invasion info and alliance status on mount
   useEffect(() => {
     const fetchInfo = async () => {
       setLoading(true);
-      const info = await getInvasionInfo(player.address, myAddress);
-      setInvasionInfo(info);
+      
+      // Check alliance status first
+      const allianceResult = await checkAlliance(myAddress, player.address);
+      setIsAlly(allianceResult.isAllied);
+      
+      // Only fetch invasion info if not allies
+      if (!allianceResult.isAllied) {
+        const info = await getInvasionInfo(player.address, myAddress);
+        setInvasionInfo(info);
+      }
+      
       setLoading(false);
     };
     fetchInfo();
@@ -924,9 +958,15 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-display text-xl font-bold text-white">{player.playerName}</h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${threatStyle.bg} ${threatStyle.border} ${threatStyle.text} border`}>
-                {threatStyle.label}
-              </span>
+              {isAlly ? (
+                <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-green-500/20 border-green-500/50 text-green-400 border">
+                  🤝 ALLY
+                </span>
+              ) : (
+                <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${threatStyle.bg} ${threatStyle.border} ${threatStyle.text} border`}>
+                  {threatStyle.label}
+                </span>
+              )}
             </div>
             <p className="font-body text-sm text-gray-400">
               Power Level: ⚡{player.powerLevel} | Score: {player.score.toLocaleString()}
@@ -995,7 +1035,7 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
             </div>
           </div>
 
-          {/* Invasion Requirements */}
+          {/* Invasion Requirements / Alliance Status */}
           {loading ? (
             <div className="mt-4 text-center text-gray-400">
               <motion.div
@@ -1005,7 +1045,17 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
               >
                 ⏳
               </motion.div>
-              <span className="ml-2">Analyzing defenses...</span>
+              <span className="ml-2">Analyzing player status...</span>
+            </div>
+          ) : isAlly ? (
+            <div className="mt-4 p-4 rounded-lg border border-green-500/30 bg-green-500/10">
+              <h4 className="font-display text-sm font-bold text-green-400 mb-2 flex items-center gap-2">
+                <span>🤝</span> Allied Player
+              </h4>
+              <p className="text-sm text-gray-300">
+                This player is your ally. You cannot invade allies. 
+                If you wish to attack, end the alliance first from the Diplomacy panel.
+              </p>
             </div>
           ) : invasionInfo ? (
             <div className="mt-4">
@@ -1067,6 +1117,19 @@ function PlayerDetailsPanel({ player, onClose, myAddress, onInvasionComplete }: 
           >
             Close
           </motion.button>
+        ) : isAlly ? (
+          <>
+            <div className="flex-1 py-2 rounded-lg font-display text-center text-sm bg-green-500/10 border border-green-500/30 text-green-400">
+              🤝 This player is your ally. End the alliance in Diplomacy panel to invade.
+            </div>
+            <motion.button
+              className="flex-1 rounded-lg border border-nebula-500 py-2 font-display font-bold text-nebula-400 hover:bg-nebula-500/10"
+              onClick={onClose}
+              whileHover={{ scale: 1.02 }}
+            >
+              Close
+            </motion.button>
+          </>
         ) : (
           <>
             <motion.button
