@@ -56,10 +56,12 @@ export function GalaxyPanel() {
       // Fetch active alliances to mark allies
       const alliances = await getActiveAlliances(web3Address);
       const allies = new Set<string>();
-      alliances.forEach(a => {
-        const otherPlayer = a.player1.toLowerCase() === web3Address.toLowerCase() ? a.player2 : a.player1;
-        allies.add(otherPlayer.toLowerCase());
-      });
+      if (alliances) {
+        alliances.forEach(a => {
+          const otherPlayer = a.player1.toLowerCase() === web3Address.toLowerCase() ? a.player2 : a.player1;
+          allies.add(otherPlayer.toLowerCase());
+        });
+      }
       setAllyAddresses(allies);
     } catch (e) {
       console.warn('Could not fetch galaxy players');
