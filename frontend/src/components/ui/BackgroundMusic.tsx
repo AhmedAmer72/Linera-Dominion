@@ -127,7 +127,7 @@ export function BackgroundMusic() {
   }, [tracks.length]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-20 right-4 z-[60]">
       {/* Expanded Controls Panel */}
       {showControls && (
         <div 
