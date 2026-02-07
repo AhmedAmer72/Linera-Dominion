@@ -5,6 +5,7 @@ import { useGameStore } from '@/store/gameStore';
 import { useWallet } from '@/hooks/useWallet';
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
+import { SettingsModal } from '@/components/ui/SettingsModal';
 
 // Resource icon component with fallback
 function ResourceIcon({ src, alt, fallback }: { src: string; alt: string; fallback: string }) {
@@ -154,6 +155,7 @@ function ConnectWalletButton() {
 export function ResourceBar() {
   const { resources, resourceRates, tickResources, saveCurrentState, gameState } = useGameStore();
   const [displayResources, setDisplayResources] = useState(resources);
+  const [showSettings, setShowSettings] = useState(false);
   const saveTickRef = useRef(0);
 
   // Sync displayResources when resources change (e.g. after building)
@@ -265,14 +267,19 @@ export function ResourceBar() {
           <GameTime />
           <ConnectWalletButton />
           <motion.button
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-nebula-500/30 bg-void/50 text-gray-400 transition-all hover:border-nebula-500 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-nebula-500/30 bg-void/50 text-gray-400 transition-all hover:border-nebula-500 hover:text-white hover:bg-nebula-500/20"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            onClick={() => setShowSettings(true)}
+            title="Settings"
           >
             <SettingsIcon />
           </motion.button>
         </motion.div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 }

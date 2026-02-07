@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Providers } from './providers';
+import BackgroundMusic from '@/components/ui/BackgroundMusic';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
         <div className="starfield" />
         <Providers>
           {children}
+          <BackgroundMusic />
         </Providers>
       </body>
     </html>

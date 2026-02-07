@@ -233,3 +233,33 @@ body {
     radial-gradient(2px 2px at 95% 40%, rgba(255, 255, 255, 0.8), transparent);
   opacity: 0.5;
 }
+
+/* Background Music Component Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Glow effects for music player */
+.shadow-glow-plasma {
+  box-shadow: 0 0 8px rgba(0, 184, 230, 0.6);
+}
+
+.shadow-glow-nebula {
+  box-shadow: 0 0 8px rgba(98, 25, 255, 0.6);
+}
+
+/* Font family for Orbitron */
+.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}

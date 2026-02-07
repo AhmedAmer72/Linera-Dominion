@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import Image from 'next/image';
 import { useWallet } from '@/hooks/useWallet';
+import { SettingsModal } from './SettingsModal';
 
 // Logo component with fallback
 function LogoWithFallback() {
@@ -60,47 +61,6 @@ function MenuIcon({ src, fallback }: { src: string; fallback: string }) {
       className="object-contain"
       onError={() => setImgError(true)}
     />
-  );
-}
-
-// Settings Modal
-function SettingsModal({ onClose }: { onClose: () => void }) {
-  return (
-    <motion.div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="holo-panel w-full max-w-md p-6"
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold text-white">⚙️ Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-300">Sound Effects</span>
-            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gray-300">Music</span>
-            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gray-300">Notifications</span>
-            <button className="rounded bg-nebula-500/20 px-3 py-1 text-nebula-300">On</button>
-          </div>
-        </div>
-        <p className="mt-4 text-center text-sm text-gray-500">More settings coming soon</p>
-      </motion.div>
-    </motion.div>
   );
 }
 
@@ -423,7 +383,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
     <>
       {/* Modals */}
       <AnimatePresence>
-        {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} />}
+        <SettingsModal isOpen={modal === 'settings'} onClose={() => setModal(null)} />
         {modal === 'about' && <AboutModal onClose={() => setModal(null)} />}
         {modal === 'howtoplay' && <HowToPlayModal onClose={() => setModal(null)} />}
         {modal === 'connectwallet' && (
